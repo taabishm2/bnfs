@@ -1,2 +1,2 @@
 # Building
-From `bnfs/repo` run `source compile.sh`
+Run `source compile.sh`
