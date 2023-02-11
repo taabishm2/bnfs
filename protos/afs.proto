@@ -1,0 +1,19 @@
+// Created on Feb 5.
+
+syntax = "proto3";
+
+package afs;
+
+// Interface exported by the server.
+service FileServer {
+  // Open resp
+  rpc Open(OpenReq) returns (OpenResp) {}
+}
+
+message OpenReq {
+  string path = 1;
+}
+
+message OpenResp {
+  int32 err = 1;
+}
