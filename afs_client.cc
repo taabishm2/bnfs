@@ -32,13 +32,16 @@
 using afs::FileServer;
 using afs::OpenReq;
 using afs::OpenResp;
+using afs::SimplePathRequest;
+using afs::StatResponse;
+using afs::ReadDirResponse;
 using grpc::Channel;
 using grpc::ClientContext;
 using grpc::Status;
 
 using namespace std;
 
-#define AFS_CLIENT ((struct AFSClient *) fuse_get_context()->private_data)
+#define AFS_CLIENT ((struct AFSClient *)fuse_get_context()->private_data)
 
 class AFSClient
 {
@@ -71,6 +74,51 @@ public:
 		}
 	}
 
+	Status getAttr(string &fileName, struct stat *stbuf)
+	{
+
+		SimplePathRequest request;
+		request.set_path(fileName);
+
+		StatResponse reply;
+		ClientContext context;
+
+		cout << "Client getAttr called" << endl;
+
+		Status status = stub_->GetAttr(&context, request, &reply);
+
+		if (status.ok())
+		{
+			stbuf->st_dev = reply.dev();
+			stbuf->st_ino = reply.ino();
+			stbuf->st_mode = reply.mode();
+			stbuf->st_nlink = reply.nlink();
+			stbuf->st_rdev = reply.rdev();
+			stbuf->st_size = reply.size();
+			stbuf->st_blksize = reply.blksize();
+			stbuf->st_blocks = reply.blocks();
+			stbuf->st_atime = reply.atime();
+			stbuf->st_mtime = reply.mtime();
+			stbuf->st_ctime = reply.ctime();
+		}
+
+		return status;
+	}
+
+	Status readDir(string &fileName, ReadDirResponse *reply)
+	{
+
+		SimplePathRequest request;
+		request.set_path(fileName);
+
+		ClientContext context;
+
+		cout << "Client readDir called" << endl;
+
+		Status status = stub_->ReadDir(&context, request, reply);
+		return status;
+	}
+
 	unique_ptr<FileServer::Stub> stub_;
 	string cache_root;
 };
@@ -81,7 +129,7 @@ static int xmp_getattr(const char *path, struct stat *stbuf)
 
 	// Call AFS server.
 	string path_str = path;
-	AFS_CLIENT -> Open(path_str);
+	AFS_CLIENT->Open(path_str);
 
 	res = lstat(path, stbuf);
 	if (res == -1)
@@ -113,14 +161,38 @@ static int xmp_readlink(const char *path, char *buf, size_t size)
 	return 0;
 }
 
-static int xmp_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
-					   off_t offset, struct fuse_file_info *fi)
+static int bnfs_getattr(const char *path, struct stat *stbuf)
 {
+	int res;
+
+	string path_str = path;
+	Status status = AFS_CLIENT->getAttr(path_str, stbuf);
+
+	if (!status.ok())
+		return -errno;
+	return 0;
+}
+
+static int bnfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
+						off_t offset, struct fuse_file_info *fi)
+{
+
+	ReadDirResponse *reply;
+	int res;
+
+	string path_str = path;
+	Status status = AFS_CLIENT->readDir(path_str, reply);
+
+	if (!status.ok())
+		return -errno;
+
 	DIR *dp;
 	struct dirent *de;
 
+	// Nothing to do on server with them
 	(void)offset;
 	(void)fi;
+	// filler to be used locally
 
 	dp = opendir(path);
 	if (dp == NULL)
@@ -281,7 +353,7 @@ static int xmp_open(const char *path, struct fuse_file_info *fi)
 
 	// Call AFS server.
 	string path_str = path;
-	AFS_CLIENT-> Open(path_str);
+	AFS_CLIENT->Open(path_str);
 
 	res = open(path, fi->flags);
 	if (res == -1)
@@ -423,7 +495,7 @@ static int xmp_removexattr(const char *path, const char *name)
 #endif /* HAVE_SETXATTR */
 
 static struct fuse_operations xmp_oper = {
-	.getattr = xmp_getattr,
+	.getattr = bnfs_getattr,
 	.readlink = xmp_readlink,
 	.mknod = xmp_mknod,
 	.mkdir = xmp_mkdir,
@@ -447,7 +519,7 @@ static struct fuse_operations xmp_oper = {
 	.listxattr = xmp_listxattr,
 	.removexattr = xmp_removexattr,
 #endif
-	.readdir = xmp_readdir,
+	.readdir = bnfs_readdir,
 	.access = xmp_access,
 #ifdef HAVE_UTIMENSAT
 	.utimens = xmp_utimens,
@@ -462,10 +534,7 @@ int main(int argc, char *argv[])
 {
 	umask(0);
 
-	// afs_data_t* afs_data = new afs_data_t(std::string(cache_root));
-	// afs_data->stub_ = AFS::NewStub(grpc::CreateChannel(server_addr, grpc::InsecureChannelCredentials()));
-
-	AFSClient * afsClient = new AFSClient(
+	AFSClient *afsClient = new AFSClient(
 		grpc::CreateChannel("localhost:50051", grpc::InsecureChannelCredentials()),
 		"/");
 	cout << "Initialized AFS client" << endl;
