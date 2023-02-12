@@ -32,6 +32,10 @@
 using afs::FileServer;
 using afs::OpenReq;
 using afs::OpenResp;
+using afs::PutFileReq;
+using afs::PutFileResp;
+using afs::DeleteReq;
+using afs::DeleteResp;
 using grpc::Channel;
 using grpc::ClientContext;
 using grpc::Status;
@@ -55,7 +59,7 @@ public:
 		OpenResp reply;
 		ClientContext context;
 
-		cout << "client open called" << endl;
+		cout << "[log] AFS client open called" << endl;
 
 		Status status = stub_->Open(&context, request, &reply);
 
@@ -67,7 +71,43 @@ public:
 		{
 			cout << status.error_code() << ": " << status.error_message()
 				 << endl;
-			return "RPC failed";
+			return "Open RPC failed";
+		}
+	}
+
+  int Close(const char* file_path)
+	{
+    // Read file from local cache, if present.
+    int fd = open(file_path, O_RDONLY);
+	  if (fd == -1)
+		  return -errno;
+
+    char *buf;
+    int size = 1000; // TODO: read and put file in chunks using streaming.
+    int res = pread(fd, buf, size, 0);
+    if (res == -1)
+      return -errno;
+
+    // Prepare grpc messages.
+    PutFileReq request;
+    PutFileResp reply;
+    ClientContext context;
+
+		request.set_path(file_path);
+    request.set_contents(buf);
+
+		Status status = stub_->PutFile(&context, request, &reply);
+
+		if (status.ok())
+		{
+      cout << "[log] AFS file contents sent" << endl;
+			return 0;
+		}
+		else
+		{
+			cout << status.error_code() << ": " << status.error_message()
+				 << endl;
+			return -errno;
 		}
 	}
 
@@ -79,9 +119,9 @@ static int xmp_getattr(const char *path, struct stat *stbuf)
 {
 	int res;
 
-	// Call AFS server.
-	string path_str = path;
-	AFS_CLIENT -> Open(path_str);
+  // Open attr from afs.
+  string file_path(path);
+	AFS_CLIENT -> Open(file_path);
 
 	res = lstat(path, stbuf);
 	if (res == -1)
@@ -275,13 +315,13 @@ static int xmp_utimens(const char *path, const struct timespec ts[2])
 }
 #endif
 
-static int xmp_open(const char *path, struct fuse_file_info *fi)
+static int wiscafs_open(const char *path, struct fuse_file_info *fi)
 {
 	int res;
 
-	// Call AFS server.
-	string path_str = path;
-	AFS_CLIENT-> Open(path_str);
+  // Open file from afs.
+  string file_path(path);
+	AFS_CLIENT -> Open(file_path);
 
 	res = open(path, fi->flags);
 	if (res == -1)
@@ -310,12 +350,14 @@ static int xmp_read(const char *path, char *buf, size_t size, off_t offset,
 	return res;
 }
 
-static int xmp_write(const char *path, const char *buf, size_t size,
+// Implements the write call for client.
+static int wiscafs_write(const char *path, const char *buf, size_t size,
 					 off_t offset, struct fuse_file_info *fi)
 {
 	int fd;
 	int res;
 
+  // TODO: open file located in cache dir.
 	(void)fi;
 	fd = open(path, O_WRONLY);
 	if (fd == -1)
@@ -340,14 +382,13 @@ static int xmp_statfs(const char *path, struct statvfs *stbuf)
 	return 0;
 }
 
-static int xmp_release(const char *path, struct fuse_file_info *fi)
+static int wiscafs_release(const char *path, struct fuse_file_info *fi)
 {
-	/* Just a stub.	 This method is optional and can safely be left
-	   unimplemented */
-
-	(void)path;
+  (void)path;
 	(void)fi;
-	return 0;
+
+  // Flush changes from local file to afs.
+	return AFS_CLIENT -> Close(path);
 }
 
 static int xmp_fsync(const char *path, int isdatasync,
@@ -435,11 +476,11 @@ static struct fuse_operations xmp_oper = {
 	.chmod = xmp_chmod,
 	.chown = xmp_chown,
 	.truncate = xmp_truncate,
-	.open = xmp_open,
+	.open = wiscafs_open,
 	.read = xmp_read,
-	.write = xmp_write,
+	.write = wiscafs_write,
 	.statfs = xmp_statfs,
-	.release = xmp_release,
+	.release = wiscafs_release,
 	.fsync = xmp_fsync,
 #ifdef HAVE_SETXATTR
 	.setxattr = xmp_setxattr,
@@ -461,9 +502,6 @@ static struct fuse_operations xmp_oper = {
 int main(int argc, char *argv[])
 {
 	umask(0);
-
-	// afs_data_t* afs_data = new afs_data_t(std::string(cache_root));
-	// afs_data->stub_ = AFS::NewStub(grpc::CreateChannel(server_addr, grpc::InsecureChannelCredentials()));
 
 	AFSClient * afsClient = new AFSClient(
 		grpc::CreateChannel("localhost:50051", grpc::InsecureChannelCredentials()),

@@ -13,18 +13,15 @@ service FileServer {
   rpc Read(ReadReq) returns (ReadResp) {}
 
  // 
-  rpc Write(ReadReq) returns (ReadResp) {}
-
- // 
   rpc Close(ReadReq) returns (ReadResp) {}
-
- // 
-  rpc Delete(ReadReq) returns (ReadResp) {}
 
  // 
   rpc GetAttr(ReadReq) returns (ReadResp) {}
 */
 
+  // File operations.
+  rpc PutFile(PutFileReq) returns (PutFileResp) {} 
+  rpc Delete(DeleteReq) returns (DeleteResp) {}
 }
 
 message OpenReq {
@@ -32,5 +29,25 @@ message OpenReq {
 }
 
 message OpenResp {
+  int32 err = 1;
+}
+
+// TODO: make it streaming application.
+message PutFileReq {
+  string path = 1;
+
+  // File content.
+  bytes contents = 2;
+}
+
+message PutFileResp {
+  int32 err = 1;
+}
+
+message DeleteReq {
+  string path = 1;
+}
+
+message DeleteResp {
   int32 err = 1;
 }

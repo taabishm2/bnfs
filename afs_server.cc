@@ -11,6 +11,10 @@
 using afs::FileServer;
 using afs::OpenReq;
 using afs::OpenResp;
+using afs::PutFileReq;
+using afs::PutFileResp;
+using afs::DeleteReq;
+using afs::DeleteResp;
 using grpc::Server;
 using grpc::ServerBuilder;
 using grpc::ServerContext;
@@ -23,7 +27,27 @@ class FileServerServiceImpl final : public FileServer::Service
     Status Open(ServerContext *context, const OpenReq *request,
                 OpenResp *reply) override
     {
-        cout << "Recieved RPC from client!" << endl;
+        cout << "Recieved Open RPC from client!" << endl;
+
+        reply->set_err(0);
+        return Status::OK;
+    }
+
+    Status PutFile(ServerContext *context, const PutFileReq *request,
+                PutFileResp *reply) override
+    {
+        cout << "Recieved PutFile RPC from client!" << endl;
+        cout << "File name: " << request->path() << " contents\n" <<
+            request -> contents() << endl;
+
+        reply->set_err(0);
+        return Status::OK;
+    }
+
+    Status Delete(ServerContext *context, const DeleteReq *request,
+                DeleteResp *reply) override
+    {
+        cout << "Recieved Delete RPC from client!" << endl;
 
         reply->set_err(0);
         return Status::OK;
