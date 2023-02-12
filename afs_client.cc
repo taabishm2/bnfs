@@ -32,9 +32,9 @@
 using afs::FileServer;
 using afs::OpenReq;
 using afs::OpenResp;
+using afs::ReadDirResponse;
 using afs::SimplePathRequest;
 using afs::StatResponse;
-using afs::ReadDirResponse;
 using grpc::Channel;
 using grpc::ClientContext;
 using grpc::Status;
@@ -101,7 +101,7 @@ public:
 			stbuf->st_mtime = reply.mtime();
 			stbuf->st_ctime = reply.ctime();
 		}
-
+		
 		return status;
 	}
 
@@ -112,10 +112,8 @@ public:
 		request.set_path(fileName);
 
 		ClientContext context;
-
-		cout << "Client readDir called" << endl;
-
 		Status status = stub_->ReadDir(&context, request, reply);
+
 		return status;
 	}
 
@@ -177,38 +175,22 @@ static int bnfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 						off_t offset, struct fuse_file_info *fi)
 {
 
-	ReadDirResponse *reply;
-	int res;
-
+	ReadDirResponse reply;
 	string path_str = path;
-	Status status = AFS_CLIENT->readDir(path_str, reply);
+
+	Status status = AFS_CLIENT->readDir(path_str, &reply);
 
 	if (!status.ok())
 		return -errno;
 
-	DIR *dp;
-	struct dirent *de;
-
-	// Nothing to do on server with them
-	(void)offset;
-	(void)fi;
-	// filler to be used locally
-
-	dp = opendir(path);
-	if (dp == NULL)
-		return -errno;
-
-	while ((de = readdir(dp)) != NULL)
+	for (int i = 0; i < reply.dirname_size(); i++)
 	{
-		struct stat st;
-		memset(&st, 0, sizeof(st));
-		st.st_ino = de->d_ino;
-		st.st_mode = de->d_type << 12;
-		if (filler(buf, de->d_name, &st, 0))
-			break;
+		if (filler(buf, reply.dirname(i).c_str(), NULL, 0) != 0)
+		{
+			return -ENOMEM;
+		}
 	}
 
-	closedir(dp);
 	return 0;
 }
 

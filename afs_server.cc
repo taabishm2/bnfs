@@ -14,9 +14,9 @@
 using afs::FileServer;
 using afs::OpenReq;
 using afs::OpenResp;
+using afs::ReadDirResponse;
 using afs::SimplePathRequest;
 using afs::StatResponse;
-using afs::ReadDirResponse;
 using grpc::Server;
 using grpc::ServerBuilder;
 using grpc::ServerContext;
@@ -46,7 +46,7 @@ class FileServerServiceImpl final : public FileServer::Service
         if (res == -1)
             res = -errno;
 
-        // Do this only if res is not error. also return res 
+        // Do this only if res is not error. also return res
         reply->set_dev(stbuf.st_dev);
         reply->set_ino(stbuf.st_ino);
         reply->set_mode(stbuf.st_mode);
@@ -63,23 +63,22 @@ class FileServerServiceImpl final : public FileServer::Service
     }
 
     Status ReadDir(ServerContext *context, const SimplePathRequest *request,
-                   StatResponse *reply)
+                   ReadDirResponse *reply)
     {
+
+        cout << "Recieved ReadDir RPC from client!" << endl;
         DIR *dp;
         int res = 0;
         struct dirent *de;
 
-        //dp = opendir(request->path().c_str());
+        // dp = opendir(request->path().c_str());
         dp = opendir("/testdir");
         if (dp == NULL)
             res = -errno;
 
         while ((de = readdir(dp)) != NULL)
-        {            
-            const char *d_name = de->d_name;
-            // reply->add_dirname(de->d_name);
-            // std::string* s = reply->add_dirname();
-            // s->assign(de->d_name);
+        {
+            reply->add_dirname(de->d_name);
         }
 
         closedir(dp);
