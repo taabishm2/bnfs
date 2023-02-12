@@ -38,13 +38,15 @@ using grpc::Status;
 
 using namespace std;
 
+#define AFS_CLIENT ((struct AFSClient *) fuse_get_context()->private_data)
+
 class AFSClient
 {
 public:
-	AFSClient(shared_ptr<Channel> channel)
-		: stub_(FileServer::NewStub(channel)) {}
+	AFSClient(shared_ptr<Channel> channel, string cache_root)
+		: stub_(FileServer::NewStub(channel)), cache_root(cache_root) {}
 
-	string Open(const string &fileName)
+	string Open(string &fileName)
 	{
 
 		OpenReq request;
@@ -52,6 +54,8 @@ public:
 
 		OpenResp reply;
 		ClientContext context;
+
+		cout << "client open called" << endl;
 
 		Status status = stub_->Open(&context, request, &reply);
 
@@ -67,13 +71,17 @@ public:
 		}
 	}
 
-private:
 	unique_ptr<FileServer::Stub> stub_;
+	string cache_root;
 };
 
 static int xmp_getattr(const char *path, struct stat *stbuf)
 {
 	int res;
+
+	// Call AFS server.
+	string path_str = path;
+	AFS_CLIENT -> Open(path_str);
 
 	res = lstat(path, stbuf);
 	if (res == -1)
@@ -271,6 +279,10 @@ static int xmp_open(const char *path, struct fuse_file_info *fi)
 {
 	int res;
 
+	// Call AFS server.
+	string path_str = path;
+	AFS_CLIENT-> Open(path_str);
+
 	res = open(path, fi->flags);
 	if (res == -1)
 		return -errno;
@@ -453,10 +465,10 @@ int main(int argc, char *argv[])
 	// afs_data_t* afs_data = new afs_data_t(std::string(cache_root));
 	// afs_data->stub_ = AFS::NewStub(grpc::CreateChannel(server_addr, grpc::InsecureChannelCredentials()));
 
-	AFSClient afsClient(
-		grpc::CreateChannel("localhost:50051", grpc::InsecureChannelCredentials()));
+	AFSClient * afsClient = new AFSClient(
+		grpc::CreateChannel("localhost:50051", grpc::InsecureChannelCredentials()),
+		"/");
+	cout << "Initialized AFS client" << endl;
 
-	afsClient.Open("test.txt");
-
-	return fuse_main(argc, argv, &xmp_oper, NULL);
+	return fuse_main(argc, argv, &xmp_oper, afsClient);
 }

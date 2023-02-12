@@ -8,6 +8,23 @@ package afs;
 service FileServer {
   // Open resp
   rpc Open(OpenReq) returns (OpenResp) {}
+  
+ /* // 
+  rpc Read(ReadReq) returns (ReadResp) {}
+
+ // 
+  rpc Write(ReadReq) returns (ReadResp) {}
+
+ // 
+  rpc Close(ReadReq) returns (ReadResp) {}
+
+ // 
+  rpc Delete(ReadReq) returns (ReadResp) {}
+
+ // 
+  rpc GetAttr(ReadReq) returns (ReadResp) {}
+*/
+
 }
 
 message OpenReq {
