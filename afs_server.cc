@@ -98,28 +98,28 @@ class FileServerServiceImpl final : public FileServer::Service
         reply->set_atime(stbuf.st_atime);
         reply->set_mtime(stbuf.st_mtime);
         reply->set_ctime(stbuf.st_ctime);
-
+        
         return Status::OK;
     }
 
+
     Status ReadDir(ServerContext *context, const SimplePathRequest *request,
-                   StatResponse *reply)
+                   ReadDirResponse *reply)
     {
+
+        cout << "Recieved ReadDir RPC from client!" << endl;
         DIR *dp;
         int res = 0;
         struct dirent *de;
 
-        //dp = opendir(request->path().c_str());
+        // dp = opendir(request->path().c_str());
         dp = opendir("/testdir");
         if (dp == NULL)
             res = -errno;
 
         while ((de = readdir(dp)) != NULL)
-        {            
-            const char *d_name = de->d_name;
-            // reply->add_dirname(de->d_name);
-            // std::string* s = reply->add_dirname();
-            // s->assign(de->d_name);
+        {
+            reply->add_dirname(de->d_name);
         }
 
         closedir(dp);

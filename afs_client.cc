@@ -45,6 +45,9 @@ using afs::OpenReq;
 using afs::SimplePathRequest;
 using afs::StatResponse;
 using afs::ReadDirResponse;
+using afs::ReadDirResponse;
+using afs::SimplePathRequest;
+using afs::StatResponse;
 using grpc::Channel;
 using grpc::ClientContext;
 using grpc::Status;
@@ -53,6 +56,7 @@ using namespace std;
 
 #define AFS_CLIENT ((struct AFSClient *) fuse_get_context()->private_data)
 #define LOCAL_CREAT_FILE "locally_generated_file"
+
 
 class AFSClient
 {
@@ -210,17 +214,6 @@ public:
 	string cache_root;
 };
 
-static int xmp_access(const char *path, int mask)
-{
-	int res;
-
-	res = access(path, mask);
-	if (res == -1)
-		return -errno;
-
-	return 0;
-}
-
 static int xmp_readlink(const char *path, char *buf, size_t size)
 {
 	int res;
@@ -249,38 +242,22 @@ static int bnfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 						off_t offset, struct fuse_file_info *fi)
 {
 
-	ReadDirResponse *reply;
-	int res;
-
+	ReadDirResponse reply;
 	string path_str = path;
-	Status status = AFS_CLIENT->readDir(path_str, reply);
+
+	Status status = AFS_CLIENT->readDir(path_str, &reply);
 
 	if (!status.ok())
 		return -errno;
 
-	DIR *dp;
-	struct dirent *de;
-
-	// Nothing to do on server with them
-	(void)offset;
-	(void)fi;
-	// filler to be used locally
-
-	dp = opendir(path);
-	if (dp == NULL)
-		return -errno;
-
-	while ((de = readdir(dp)) != NULL)
+	for (int i = 0; i < reply.dirname_size(); i++)
 	{
-		struct stat st;
-		memset(&st, 0, sizeof(st));
-		st.st_ino = de->d_ino;
-		st.st_mode = de->d_type << 12;
-		if (filler(buf, de->d_name, &st, 0))
-			break;
+		if (filler(buf, reply.dirname(i).c_str(), NULL, 0) != 0)
+		{
+			return -ENOMEM;
+		}
 	}
 
-	closedir(dp);
 	return 0;
 }
 
@@ -441,17 +418,20 @@ static int xmp_utimens(const char *path, const struct timespec ts[2])
 }
 #endif
 
-static int xmp_read(const char *path, char *buf, size_t size, off_t offset,
-					struct fuse_file_info *fi)
-{
-	// int fd;
-	// int res;
+// static int xmp_read(const char *path, char *buf, size_t size, off_t offset,
+// 					struct fuse_file_info *fi)
+// {
+// 	// Call AFS server.
+// 	string path_str = path;
+// 	AFS_CLIENT->Open(path_str);
 
-    ssize_t rc = pread(fi->fh, buf, size, offset);
-    if (rc < 0)
-        return -errno;
-    return rc;
-}
+// 	res = open(path, fi->flags);
+// 	if (res == -1)
+// 		return -errno;
+
+// 	close(res);
+// 	return 0;
+// }
 
 // 	// Call AFS server.
 // 	string path_str = path;
@@ -596,7 +576,7 @@ static struct fuse_operations xmp_oper = {
 	.chown = xmp_chown,
 	.truncate = xmp_truncate,
 	.open = bnfs_open,
-	.read = xmp_read,
+	// .read = xmp_read,
 	.write = xmp_write,
 	.statfs = xmp_statfs,
 	.release = xmp_release,
@@ -608,7 +588,7 @@ static struct fuse_operations xmp_oper = {
 	.removexattr = xmp_removexattr,
 #endif
 	.readdir = bnfs_readdir,
-	.access = xmp_access,
+	// .access = xmp_access,
 #ifdef HAVE_UTIMENSAT
 	.utimens = xmp_utimens,
 #endif
@@ -622,7 +602,7 @@ int main(int argc, char *argv[])
 {
 	umask(0);
 
-	AFSClient * afsClient = new AFSClient(
+	AFSClient *afsClient = new AFSClient(
 		grpc::CreateChannel("localhost:50051", grpc::InsecureChannelCredentials()),
 		"/");
 	cout << "Initialized AFS client" << endl;
