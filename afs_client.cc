@@ -40,7 +40,6 @@
 #include "afs.grpc.pb.h"
 
 using afs::FileServer;
-using afs::OpenReq;
 using afs::OpenResp;
 using afs::SimplePathRequest;
 using afs::StatResponse;
@@ -51,13 +50,9 @@ using grpc::Status;
 
 using namespace std;
 
-<<<<<<< HEAD
 #define AFS_CLIENT ((struct AFSClient *) fuse_get_context()->private_data)
 #define AFS_DATA ((struct afs_data_t *) fuse_get_context()->private_data)
 #define LOCAL_CREAT_FILE "locally_generated_file"
-=======
-#define AFS_CLIENT ((struct AFSClient *)fuse_get_context()->private_data)
->>>>>>> 6b8d4e758f546595443925c4d9046eba94fb8765
 
 class AFSClient
 {
@@ -68,7 +63,7 @@ public:
 	string Open(string &fileName)
 	{
 
-		OpenReq request;
+		SimplePathRequest request;
 		request.set_path(fileName);
 
 		OpenResp reply;
@@ -76,18 +71,18 @@ public:
 
 		cout << "client open called" << endl;
 
-		Status status = stub_->Open(&context, request, &reply);
+		// Status status = stub_->Open(&context, request, &reply);
 
-		if (status.ok())
-		{
-			return "success: received " + to_string(reply.err());
-		}
-		else
-		{
-			cout << status.error_code() << ": " << status.error_message()
-				 << endl;
-			return "RPC failed";
-		}
+		// if (status.ok())
+		// {
+		// 	// return "success: received " + to_string(reply.err());
+		// }
+		// else
+		// {
+		// 	cout << status.error_code() << ": " << status.error_message()
+		// 		 << endl;
+		// 	return "RPC failed";
+		// }
 	}
 
 	Status getAttr(string &fileName, struct stat *stbuf)
@@ -669,8 +664,8 @@ int afs_open(const char *path, struct fuse_file_info *fi)
     clock_gettime(CLOCK_MONOTONIC, &t);
     std::cout << "[log] afs_open: start\n";
     std::string path_str(path);
-    Filepath filepath;
-    filepath.set_filepath(path_str);
+    SimplePathRequest filepath;
+    filepath.set_path(path_str);
     char fpath[PATH_MAX];
     if (AFS_DATA->last_modified.count(path_str) == 1) {
         // cache exists 
@@ -684,12 +679,13 @@ int afs_open(const char *path, struct fuse_file_info *fi)
             return 0;
         }
         
-        StatContent stat_content;
+        StatResponse stat_content;
         ClientContext context;
-        set_deadline(context);
-        AFS_DATA->stub_->Stat(&context, filepath, &stat_content);
+        // set_deadline(context);
+        AFS_DATA->stub_->GetAttr(&context, filepath, &stat_content);
 
-        if ( stat_content.st_mtim() == AFS_DATA->last_modified.get(path_str)) {
+        if ( true) {
+            //***********stat_content.mtime() == AFS_DATA->last_modified.get(path_str)) {
             // can use cache
             std::cout << "[log] afs_open: can use local cache\n";
             fi->fh = open(cachepath(path).c_str(), fi->flags);
@@ -711,11 +707,18 @@ int afs_open(const char *path, struct fuse_file_info *fi)
     
     // get file from server, or create a new one
     std::cout << "[log] afs_open: start downloading from server." << std::endl;
-    MetaContent msg;
+    OpenResp msg;
     ClientContext context;
-    set_deadline(context);
-    std::unique_ptr<grpc::ClientReader<MetaContent>> reader(
-        AFS_DATA->stub_->GetContent(&context, filepath));
+    // set_deadline(context);
+    OpenResp reply;
+
+
+    //std::unique_ptr<ClientReader<ReadSReply> > reader(stub_->ReadS(&context, request));
+
+    std::unique_ptr<grpc::ClientReader<OpenResp> > reader(
+        AFS_DATA->stub_->Open(&context, filepath));
+
+        // 
     if (!reader->Read(&msg)) {
         std::cout << "[err] afs_open: failed to download from server." << std::endl;
         return -EIO;
@@ -725,9 +728,9 @@ int afs_open(const char *path, struct fuse_file_info *fi)
         std::ofstream ofile(cachepath(path),
             std::ios::binary | std::ios::out | std::ios::trunc);
         // TODO: check failure
-        ofile << msg.b();
+        ofile << msg.buf();
         while (reader->Read(&msg)) {
-            ofile << msg.b();
+            ofile << msg.buf();
         }
 
         Status status = reader->Finish();
@@ -760,7 +763,7 @@ int afs_open(const char *path, struct fuse_file_info *fi)
     clock_gettime(CLOCK_MONOTONIC, &u);
     std::cout << "[log] afs_open: end. took " << 
                 ((u.tv_sec - t.tv_sec) * 1000000000 + (u.tv_nsec - t.tv_nsec)) << "ns.\n";
-    return 0;    
+    return 0;   
 }
 
 static int xmp_read(const char *path, char *buf, size_t size, off_t offset,
@@ -944,16 +947,18 @@ int main(int argc, char *argv[])
 {
 	umask(0);
 
+    char* cache_root = "";
 	afs_data_t* afs_data = new afs_data_t(std::string(cache_root));
-    afs_data->stub_ = AFS::NewStub(grpc::CreateChannel(server_addr, grpc::InsecureChannelCredentials()));
+    afs_data->stub_ = FileServer::NewStub(grpc::CreateChannel("localhost:50051", grpc::InsecureChannelCredentials()));
     if (afs_data->cache_root.back() != '/') { afs_data->cache_root += '/'; }
     std::cout<<"[STARTUP-------------------]"<< afs_data->last_modified.size() <<"\n"; 
 
 	// afs_data_t* afs_data = new afs_data_t(std::string(cache_root));
 	// afs_data->stub_ = AFS::NewStub(grpc::CreateChannel(server_addr, grpc::InsecureChannelCredentials()));
 
-	AFSClient * afsClient = new AFSClient( afs_data->stub_,
-		// grpc::CreateChannel("localhost:50051", grpc::InsecureChannelCredentials()),
+	AFSClient * afsClient = new AFSClient(
+        //  afs_data->stub_,
+		grpc::CreateChannel("localhost:50051", grpc::InsecureChannelCredentials()),
 		"/");
 	cout << "Initialized AFS client" << endl;
 

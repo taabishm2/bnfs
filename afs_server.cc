@@ -12,7 +12,6 @@
 #include "afs.grpc.pb.h"
 
 using afs::FileServer;
-using afs::OpenReq;
 using afs::OpenResp;
 using afs::SimplePathRequest;
 using afs::StatResponse;
@@ -20,18 +19,25 @@ using afs::ReadDirResponse;
 using grpc::Server;
 using grpc::ServerBuilder;
 using grpc::ServerContext;
+using grpc::ServerWriter;
 using grpc::Status;
 
 using namespace std;
 
 class FileServerServiceImpl final : public FileServer::Service
 {
-    Status Open(ServerContext *context, const OpenReq *request,
-                OpenResp *reply) override
+    Status Open(ServerContext *context, const SimplePathRequest *request,
+                ServerWriter<OpenResp> *reply) override
     {
         cout << "Recieved RPC from client!" << endl;
 
-        reply->set_err(0);
+        // bool file_exists = 1;
+        // bytes timestamp = 2; // save struct stat.st_mtim
+        // bytes b = 3;
+        // reply->set_file_exists(0);
+        // reply->set_timestamp(0);
+        // reply->set_num_bytes(0);
+        // reply->set_buf(0);
         return Status::OK;
     }
 

@@ -4,7 +4,7 @@ package afs;
 
 service FileServer {
   
-  rpc Open(OpenReq) returns (OpenResp) {}
+  rpc Open(SimplePathRequest) returns (stream OpenResp) {}
 
   rpc GetAttr(SimplePathRequest) returns (StatResponse) {}
 
@@ -12,12 +12,12 @@ service FileServer {
 
 }
 
-message OpenReq {
-  string path = 1;
-}
 
 message OpenResp {
-  int32 err = 1;
+  bool file_exists = 1;
+  bytes timestamp = 2; // save struct stat.st_mtim
+  int32 num_bytes = 3;
+  bytes buf  = 4;
 }
 
 message SimplePathRequest {
