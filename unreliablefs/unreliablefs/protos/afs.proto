@@ -8,16 +8,7 @@ package afs;
 service FileServer {
   // Open resp
   rpc Open(OpenReq) returns (OpenResp) {}
-  
- /* // 
-  rpc Read(ReadReq) returns (ReadResp) {}
-
- // 
-  rpc Close(ReadReq) returns (ReadResp) {}
-
- // 
-  rpc GetAttr(ReadReq) returns (ReadResp) {}
-*/
+  rpc GetAttr(SimplePathRequest) returns (StatResponse) {}
 
   // File operations.
   rpc PutFile(PutFileReq) returns (PutFileResp) {} 
@@ -26,10 +17,35 @@ service FileServer {
 
 message OpenReq {
   string path = 1;
+  int32 flag = 2;
 }
 
 message OpenResp {
-  int32 err = 1;
+  int32  err = 1;
+  //bool file_exists = 2;
+  //bytes timestamp = 3; // save struct stat.st_mtim... Needed?
+  //bytes buf  = 4;
+}
+
+message SimplePathRequest {
+  string path = 1;
+}
+
+message StatResponse {
+  uint64     dev		    = 1;    /* ID of device containing file */
+  uint64     ino		    = 2;    /* inode number */
+  uint64     mode		    = 3;    /* protection */
+  uint64     nlink 		  = 4;   	/* number of hard links */
+  uint64     rdev		    = 6;    /* device ID (if special file) */
+  uint64     size		    = 7;    /* total size, in bytes */
+  uint64     blksize 		= 8; 	  /* blocksize for file system I/O */
+  uint64     blocks 		= 9;  	/* number of 512B blocks allocated */
+  uint64     atime 		  = 10;   /* time of last access */
+  uint64     atimens		= 11;
+  uint64     mtime		  = 12;   /* time of last modification */
+  uint64     mtimens		= 13;
+  uint64     ctime		  = 14;   /* time of last status change */
+  uint64     ctimens		= 15;
 }
 
 // TODO: make it streaming application.

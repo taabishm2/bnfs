@@ -29,13 +29,16 @@
 
 #include "afs.grpc.pb.h"
 
+using afs::DeleteReq;
+using afs::DeleteResp;
 using afs::FileServer;
 using afs::OpenReq;
 using afs::OpenResp;
 using afs::PutFileReq;
 using afs::PutFileResp;
-using afs::DeleteReq;
-using afs::DeleteResp;
+// using afs::ReadDirResponse;
+using afs::SimplePathRequest;
+using afs::StatResponse;
 using grpc::Channel;
 using grpc::ClientContext;
 using grpc::Status;
@@ -87,6 +90,40 @@ struct AFSClient
     return 0;
   }
 
+  int GetAttr(const char* fileName, struct stat *stbuf)
+	{
+		SimplePathRequest request;
+		request.set_path(fileName);
+
+		StatResponse reply;
+		ClientContext context;
+
+		cout << "Client getAttr called" << endl;
+
+		Status status = stub_->GetAttr(&context, request, &reply);
+
+		if (status.ok())
+		{
+			stbuf->st_dev = reply.dev();
+			stbuf->st_ino = reply.ino();
+			stbuf->st_mode = reply.mode();
+			stbuf->st_nlink = reply.nlink();
+			stbuf->st_rdev = reply.rdev();
+			stbuf->st_size = reply.size();
+			stbuf->st_blksize = reply.blksize();
+			stbuf->st_blocks = reply.blocks();
+			stbuf->st_atime = reply.atime();
+			stbuf->st_mtime = reply.mtime();
+			stbuf->st_ctime = reply.ctime();
+		} else {
+      return -1;
+    }
+
+		return 0;
+	}
+
+
+
   int Close(const char* file_path)
   {
     // Read file from local cache, if present.
@@ -137,6 +174,11 @@ AFSClient* NewAFSClient(char* cache_root) {
 
 int AFS_open(AFSClient* client, const char* file_path) {
   return client -> Open(file_path);
+}
+
+int AFS_getAttr(AFSClient* client, 
+    const char* file_path, struct stat *buf) {
+  return client -> GetAttr(file_path, buf);
 }
 
 int AFS_close(AFSClient* client, const char* file_path) {

@@ -107,6 +107,10 @@ int unreliable_getattr(const char *path, struct stat *buf)
         return -errno;
     }
 
+	ret = AFS_getAttr(afsClient, path, buf);
+	if (ret < 0)
+		return -errno;
+
     return 0;
 }
 
