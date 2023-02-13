@@ -1,57 +1,158 @@
 #include <iostream>
 #include <memory>
 #include <string>
+#include <fcntl.h>    /* For O_RDWR */
+#include <unistd.h>   /* For open(), creat() */
+#include <fstream>
+#include <sstream>
+#include <iomanip>
 
 #include <grpcpp/ext/proto_server_reflection_plugin.h>
 #include <grpcpp/grpcpp.h>
 #include <grpcpp/health_check_service_interface.h>
 
+#include <sys/stat.h>
+#include <dirent.h>
+
+#include <openssl/sha.h>
+
 #include "afs.grpc.pb.h"
 
 using afs::FileServer;
-using afs::OpenReq;
 using afs::OpenResp;
-using afs::PutFileReq;
-using afs::PutFileResp;
-using afs::DeleteReq;
-using afs::DeleteResp;
+using afs::OpenReq;
+using afs::SimplePathRequest;
+using afs::StatResponse;
+using afs::ReadDirResponse;
 using grpc::Server;
 using grpc::ServerBuilder;
 using grpc::ServerContext;
+using grpc::ServerWriter;
 using grpc::Status;
 
 using namespace std;
 
+#define BUFSIZE 65500
+#define FS_ROOT "fs_root"
+#define CACHE "cache"
+std::string AFS_ROOT_DIR;
+
 class FileServerServiceImpl final : public FileServer::Service
 {
+    
     Status Open(ServerContext *context, const OpenReq *request,
-                OpenResp *reply) override
+                ServerWriter<OpenResp> *writer) override
     {
         cout << "Recieved Open RPC from client!" << endl;
+        OpenResp reply;
+        // string path = request->path();
+        // TOD0(Sweksha) : Use getServerFilepath
+       string path = getServerFilepath(request->path());
+       ifstream file(path,ios::in);
+        cout << "Opening: " << path << "\n";
 
-        reply->set_err(0);
+        if (!file.is_open()) {
+            reply.set_file_exists(false);
+            writer->Write(reply);
+            return Status::OK;
+        }
+        reply.set_file_exists(true);
+
+       string buf(BUFSIZE, '\0');
+        while (file.read(&buf[0], BUFSIZE)) {
+            reply.set_buf(buf);
+            if (!writer->Write(reply))
+                break;
+        }
+        // reached eof
+        if (file.eof()) {
+            buf.resize(file.gcount());
+            reply.set_buf(buf);
+            writer->Write(reply);
+        }
+        file.close();
+        // reply.set_err(read_res);
         return Status::OK;
     }
 
-    Status PutFile(ServerContext *context, const PutFileReq *request,
-                PutFileResp *reply) override
+    Status GetAttr(ServerContext *context, const SimplePathRequest *request,
+                   StatResponse *reply) override
     {
-        cout << "Recieved PutFile RPC from client!" << endl;
-        cout << "File name: " << request->path() << " contents\n" <<
-            request -> contents() << endl;
+        cout << "Recieved GetAttr RPC from client!" << endl;
 
-        reply->set_err(0);
+        struct stat stbuf;
+        // int res = lstat(request->path().c_str, &stbuf);
+        int res = lstat("/testdir", &stbuf);
+        if (res == -1)
+            res = -errno;
+
+        // Do this only if res is not error. also return res 
+        reply->set_dev(stbuf.st_dev);
+        reply->set_ino(stbuf.st_ino);
+        reply->set_mode(stbuf.st_mode);
+        reply->set_nlink(stbuf.st_nlink);
+        reply->set_rdev(stbuf.st_rdev);
+        reply->set_size(stbuf.st_size);
+        reply->set_blksize(stbuf.st_blksize);
+        reply->set_blocks(stbuf.st_blocks);
+        reply->set_atime(stbuf.st_atime);
+        reply->set_mtime(stbuf.st_mtime);
+        reply->set_ctime(stbuf.st_ctime);
+
         return Status::OK;
     }
 
-    Status Delete(ServerContext *context, const DeleteReq *request,
-                DeleteResp *reply) override
+    Status ReadDir(ServerContext *context, const SimplePathRequest *request,
+                   StatResponse *reply)
     {
-        cout << "Recieved Delete RPC from client!" << endl;
+        DIR *dp;
+        int res = 0;
+        struct dirent *de;
 
-        reply->set_err(0);
+        //dp = opendir(request->path().c_str());
+        dp = opendir("/testdir");
+        if (dp == NULL)
+            res = -errno;
+
+        while ((de = readdir(dp)) != NULL)
+        {            
+            const char *d_name = de->d_name;
+            // reply->add_dirname(de->d_name);
+            // std::string* s = reply->add_dirname();
+            // s->assign(de->d_name);
+        }
+
+        closedir(dp);
         return Status::OK;
     }
+
+    private:
+    const std::string getServerFilepath(std::string filepath,  bool is_cache_filepath = false) {
+        if (is_cache_filepath)
+            return (AFS_ROOT_DIR + CACHE + "/" + hashFilepath(filepath));
+        else
+            return (AFS_ROOT_DIR + FS_ROOT + "/" + filepath);
+    }
+    const std::string getServerFilepath(const char* filepath, bool is_cache_filepath = false) {
+        return getServerFilepath(std::string(filepath), is_cache_filepath);
+    }
+    void log(char* msg) {
+        std::cout << "[log] " << msg << std::endl;
+    }
+    const std::string hashFilepath(std::string filepath) {
+            unsigned char hash[SHA256_DIGEST_LENGTH];
+            SHA256_CTX sha256;
+            SHA256_Init(&sha256);
+            SHA256_Update(&sha256, filepath.c_str(), filepath.size());
+            SHA256_Final(hash, &sha256);
+            std::stringstream ss;
+            for (int i = 0; i < SHA256_DIGEST_LENGTH; ++i) {
+                ss << std::hex << std::setw(2) << std::setfill('0') << ((int)hash[i]);
+            }
+            return ss.str();
+    }
+private:
+    pthread_mutex_t lock;
 };
 
 void RunServer()

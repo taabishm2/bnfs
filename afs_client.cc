@@ -8,6 +8,13 @@
 #define _XOPEN_SOURCE 700
 #endif
 
+
+#include <sstream>
+#include <fstream>
+#include <iomanip>
+#include <unordered_map>
+#include <chrono>
+
 #include <fuse.h>
 #include <stdio.h>
 #include <string.h>
@@ -21,6 +28,9 @@
 #include <sys/xattr.h>
 #endif
 
+// openssl library for SHA
+#include <openssl/sha.h>
+
 #include <iostream>
 #include <memory>
 #include <string>
@@ -30,12 +40,11 @@
 #include "afs.grpc.pb.h"
 
 using afs::FileServer;
-using afs::OpenReq;
 using afs::OpenResp;
-using afs::PutFileReq;
-using afs::PutFileResp;
-using afs::DeleteReq;
-using afs::DeleteResp;
+using afs::OpenReq;
+using afs::SimplePathRequest;
+using afs::StatResponse;
+using afs::ReadDirResponse;
 using grpc::Channel;
 using grpc::ClientContext;
 using grpc::Status;
@@ -43,6 +52,7 @@ using grpc::Status;
 using namespace std;
 
 #define AFS_CLIENT ((struct AFSClient *) fuse_get_context()->private_data)
+#define LOCAL_CREAT_FILE "locally_generated_file"
 
 class AFSClient
 {
@@ -50,85 +60,155 @@ public:
 	AFSClient(shared_ptr<Channel> channel, string cache_root)
 		: stub_(FileServer::NewStub(channel)), cache_root(cache_root) {}
 
-	string Open(string &fileName)
+    int Open(const char *path, struct fuse_file_info *fi) {
+        std::cout << "Open: start\n";
+        std::string path_str(path);
+        OpenReq request;
+        request.set_path(path_str);
+        request.set_flag(fi->fh);
+
+        // for getattr()
+        SimplePathRequest filepath;
+        filepath.set_path(path_str);
+        ClientContext context;
+        StatResponse getattr_reply;
+    
+        // TODO(Sweksha) : Use cache based on GetAttr() result.
+            stub_->GetAttr(&context, filepath, &getattr_reply);
+        
+        // Get file from server.
+        std::cout << "Open: Opening file from server." << std::endl;
+        
+        OpenResp reply;
+
+
+        std::unique_ptr<grpc::ClientReader<OpenResp> > reader(
+            stub_->Open(&context, request));
+
+        // Read the stream from server. 
+        if (!reader->Read(&reply)) {
+            std::cout << "[err] Open: failed to download file: " << path_str
+                      << " from server." << std::endl;
+            return -EIO;
+        }
+
+        if (reply.file_exists()) {
+            // open file with O_TRUNC
+            std::ofstream ofile(cachepath(path),
+                std::ios::binary | std::ios::out | std::ios::trunc);
+            // TODO: check failure
+            ofile << reply.buf();
+            while (reader->Read(&reply)) {
+                ofile << reply.buf();
+            }
+
+            Status status = reader->Finish();
+            if (!status.ok()) {
+                std::cout << "[err] Open: failed to download from server." << std::endl;
+                return -EIO;
+            }
+            ofile.close(); // the cache is persisted
+
+            std::cout << "Open: finish download from server\n";
+        }
+        else {
+            std::cout << "Open: created a new file\n";
+            close(creat(cachepath(path).c_str(), 00777));
+        }
+
+        // give user the file
+        fi->fh = open(cachepath(path).c_str(), fi->flags);
+        if (fi->fh < 0) {
+            std::cout << "[err] Open: error open downloaded cache file.\n";
+            return -errno;
+        }
+
+        return 0;   
+    }
+
+	Status getAttr(string &fileName, struct stat *stbuf)
 	{
 
-		OpenReq request;
+		SimplePathRequest request;
 		request.set_path(fileName);
 
-		OpenResp reply;
+		StatResponse reply;
 		ClientContext context;
 
-		cout << "[log] AFS client open called" << endl;
+		cout << "Client getAttr called" << endl;
 
-		Status status = stub_->Open(&context, request, &reply);
+		Status status = stub_->GetAttr(&context, request, &reply);
 
 		if (status.ok())
 		{
-			return "success: received " + to_string(reply.err());
+			stbuf->st_dev = reply.dev();
+			stbuf->st_ino = reply.ino();
+			stbuf->st_mode = reply.mode();
+			stbuf->st_nlink = reply.nlink();
+			stbuf->st_rdev = reply.rdev();
+			stbuf->st_size = reply.size();
+			stbuf->st_blksize = reply.blksize();
+			stbuf->st_blocks = reply.blocks();
+			stbuf->st_atime = reply.atime();
+			stbuf->st_mtime = reply.mtime();
+			stbuf->st_ctime = reply.ctime();
 		}
-		else
-		{
-			cout << status.error_code() << ": " << status.error_message()
-				 << endl;
-			return "Open RPC failed";
-		}
+
+		return status;
 	}
 
-  int Close(const char* file_path)
+	Status readDir(string &fileName, ReadDirResponse *reply)
 	{
-    // Read file from local cache, if present.
-    int fd = open(file_path, O_RDONLY);
-	  if (fd == -1)
-		  return -errno;
 
-    char *buf;
-    int size = 1000; // TODO: read and put file in chunks using streaming.
-    int res = pread(fd, buf, size, 0);
-    if (res == -1)
-      return -errno;
+		SimplePathRequest request;
+		request.set_path(fileName);
 
-    // Prepare grpc messages.
-    PutFileReq request;
-    PutFileResp reply;
-    ClientContext context;
+		ClientContext context;
 
-		request.set_path(file_path);
-    request.set_contents(buf);
+		cout << "Client readDir called" << endl;
 
-		Status status = stub_->PutFile(&context, request, &reply);
-
-		if (status.ok())
-		{
-      cout << "[log] AFS file contents sent" << endl;
-			return 0;
-		}
-		else
-		{
-			cout << status.error_code() << ": " << status.error_message()
-				 << endl;
-			return -errno;
-		}
+		Status status = stub_->ReadDir(&context, request, reply);
+		return status;
 	}
+
+    std::string cachepath(const char* rel_path) {
+        return cache_root + hashpath(rel_path);
+    }
+
+    std::string cachepath(std::string cache_root, const char* rel_path) {
+        // local cached filename is SHA-256 hash of the path
+        // referencing https://stackoverflow.com/questions/2262386/generate-sha256-with-openssl-and-c
+        unsigned char hash[SHA256_DIGEST_LENGTH];
+        SHA256_CTX sha256;
+        SHA256_Init(&sha256);
+        SHA256_Update(&sha256, rel_path, strlen(rel_path));
+        SHA256_Final(hash, &sha256);
+        std::stringstream ss;
+        for (int i = 0; i < SHA256_DIGEST_LENGTH; ++i) {
+            ss << std::hex << std::setw(2) << std::setfill('0') << ((int)hash[i]);
+        }
+        std::cout << "hashed hex string is " << ss.str() << std::endl; // debug
+        return cache_root + ss.str();
+    }
+
+    std::string hashpath(const char* rel_path) {
+        // local cached filename is SHA-256 hash of the path
+        // referencing https://stackoverflow.com/questions/2262386/generate-sha256-with-openssl-and-c
+        unsigned char hash[SHA256_DIGEST_LENGTH];
+        SHA256_CTX sha256;
+        SHA256_Init(&sha256);
+        SHA256_Update(&sha256, rel_path, strlen(rel_path));
+        SHA256_Final(hash, &sha256);
+        std::stringstream ss;
+        for (int i = 0; i < SHA256_DIGEST_LENGTH; ++i) {
+            ss << std::hex << std::setw(2) << std::setfill('0') << ((int)hash[i]);
+        }
+        return ss.str();
+    }
 
 	unique_ptr<FileServer::Stub> stub_;
 	string cache_root;
 };
-
-static int xmp_getattr(const char *path, struct stat *stbuf)
-{
-	int res;
-
-  // Open attr from afs.
-  string file_path(path);
-	AFS_CLIENT -> Open(file_path);
-
-	res = lstat(path, stbuf);
-	if (res == -1)
-		return -errno;
-
-	return 0;
-}
 
 static int xmp_access(const char *path, int mask)
 {
@@ -153,14 +233,38 @@ static int xmp_readlink(const char *path, char *buf, size_t size)
 	return 0;
 }
 
-static int xmp_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
-					   off_t offset, struct fuse_file_info *fi)
+static int bnfs_getattr(const char *path, struct stat *stbuf)
 {
+	int res;
+
+	string path_str = path;
+	Status status = AFS_CLIENT->getAttr(path_str, stbuf);
+
+	if (!status.ok())
+		return -errno;
+	return 0;
+}
+
+static int bnfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
+						off_t offset, struct fuse_file_info *fi)
+{
+
+	ReadDirResponse *reply;
+	int res;
+
+	string path_str = path;
+	Status status = AFS_CLIENT->readDir(path_str, reply);
+
+	if (!status.ok())
+		return -errno;
+
 	DIR *dp;
 	struct dirent *de;
 
+	// Nothing to do on server with them
 	(void)offset;
 	(void)fi;
+	// filler to be used locally
 
 	dp = opendir(path);
 	if (dp == NULL)
@@ -177,6 +281,28 @@ static int xmp_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	}
 
 	closedir(dp);
+	return 0;
+}
+
+static int bnfs_create(const char *path, mode_t mode,
+		               struct fuse_file_info *fi)
+{
+	int res = AFS_CLIENT->Open(path, fi);
+
+	if (res == -1)
+		return -errno;
+
+	fi->fh = res;
+	return 0;
+}
+
+static int bnfs_open(const char *path, struct fuse_file_info *fi)
+{
+    int res = AFS_CLIENT->Open(path, fi);
+	if (res == -1)
+		return -errno;
+
+	fi->fh = res;
 	return 0;
 }
 
@@ -315,49 +441,41 @@ static int xmp_utimens(const char *path, const struct timespec ts[2])
 }
 #endif
 
-static int wiscafs_open(const char *path, struct fuse_file_info *fi)
-{
-	int res;
-
-  // Open file from afs.
-  string file_path(path);
-	AFS_CLIENT -> Open(file_path);
-
-	res = open(path, fi->flags);
-	if (res == -1)
-		return -errno;
-
-	close(res);
-	return 0;
-}
-
 static int xmp_read(const char *path, char *buf, size_t size, off_t offset,
 					struct fuse_file_info *fi)
 {
-	int fd;
-	int res;
+	// int fd;
+	// int res;
 
-	(void)fi;
-	fd = open(path, O_RDONLY);
-	if (fd == -1)
-		return -errno;
-
-	res = pread(fd, buf, size, offset);
-	if (res == -1)
-		res = -errno;
-
-	close(fd);
-	return res;
+    ssize_t rc = pread(fi->fh, buf, size, offset);
+    if (rc < 0)
+        return -errno;
+    return rc;
 }
 
-// Implements the write call for client.
-static int wiscafs_write(const char *path, const char *buf, size_t size,
+// 	// Call AFS server.
+// 	string path_str = path;
+// 	AFS_CLIENT-> Read(path_str);
+
+// 	(void)fi;
+// 	fd = open(path, O_RDONLY);
+// 	if (fd == -1)
+// 		return -errno;
+
+// 	res = pread(fd, buf, size, offset);
+// 	if (res == -1)
+// 		res = -errno;
+
+// 	close(fd);
+// 	return res;
+// }
+
+static int xmp_write(const char *path, const char *buf, size_t size,
 					 off_t offset, struct fuse_file_info *fi)
 {
 	int fd;
 	int res;
 
-  // TODO: open file located in cache dir.
 	(void)fi;
 	fd = open(path, O_WRONLY);
 	if (fd == -1)
@@ -382,13 +500,14 @@ static int xmp_statfs(const char *path, struct statvfs *stbuf)
 	return 0;
 }
 
-static int wiscafs_release(const char *path, struct fuse_file_info *fi)
+static int xmp_release(const char *path, struct fuse_file_info *fi)
 {
-  (void)path;
-	(void)fi;
+	/* Just a stub.	 This method is optional and can safely be left
+	   unimplemented */
 
-  // Flush changes from local file to afs.
-	return AFS_CLIENT -> Close(path);
+	(void)path;
+	(void)fi;
+	return 0;
 }
 
 static int xmp_fsync(const char *path, int isdatasync,
@@ -464,7 +583,7 @@ static int xmp_removexattr(const char *path, const char *name)
 #endif /* HAVE_SETXATTR */
 
 static struct fuse_operations xmp_oper = {
-	.getattr = xmp_getattr,
+	.getattr = bnfs_getattr,
 	.readlink = xmp_readlink,
 	.mknod = xmp_mknod,
 	.mkdir = xmp_mkdir,
@@ -476,11 +595,11 @@ static struct fuse_operations xmp_oper = {
 	.chmod = xmp_chmod,
 	.chown = xmp_chown,
 	.truncate = xmp_truncate,
-	.open = wiscafs_open,
+	.open = bnfs_open,
 	.read = xmp_read,
-	.write = wiscafs_write,
+	.write = xmp_write,
 	.statfs = xmp_statfs,
-	.release = wiscafs_release,
+	.release = xmp_release,
 	.fsync = xmp_fsync,
 #ifdef HAVE_SETXATTR
 	.setxattr = xmp_setxattr,
@@ -488,7 +607,7 @@ static struct fuse_operations xmp_oper = {
 	.listxattr = xmp_listxattr,
 	.removexattr = xmp_removexattr,
 #endif
-	.readdir = xmp_readdir,
+	.readdir = bnfs_readdir,
 	.access = xmp_access,
 #ifdef HAVE_UTIMENSAT
 	.utimens = xmp_utimens,
