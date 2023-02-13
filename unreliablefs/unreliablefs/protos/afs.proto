@@ -6,11 +6,10 @@ package afs;
 
 // Interface exported by the server.
 service FileServer {
-  // Open resp
-  rpc Open(OpenReq) returns (OpenResp) {}
   rpc GetAttr(SimplePathRequest) returns (StatResponse) {}
 
-  // File operations.
+  // File operations
+  rpc Open(OpenReq) returns (stream OpenResp) {}
   rpc PutFile(PutFileReq) returns (PutFileResp) {} 
   rpc Delete(DeleteReq) returns (DeleteResp) {}
 }
@@ -22,9 +21,9 @@ message OpenReq {
 
 message OpenResp {
   int32  err = 1;
-  //bool file_exists = 2;
-  //bytes timestamp = 3; // save struct stat.st_mtim... Needed?
-  //bytes buf  = 4;
+  bool file_exists = 2;
+  bytes timestamp = 3; // save struct stat.st_mtim... Needed?
+  bytes buf  = 4;
 }
 
 message SimplePathRequest {

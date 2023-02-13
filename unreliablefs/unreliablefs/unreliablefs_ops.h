@@ -13,7 +13,7 @@ typedef struct AFSClient AFSClient;
 
 AFSClient* NewAFSClient();
 
-int AFS_open(AFSClient* client, const char* file_path);
+int AFS_open(AFSClient* client, const char* file_path, struct fuse_file_info *fi);
 
 int AFS_getAttr(AFSClient* client, const char* file_path, struct stat *buf);
 

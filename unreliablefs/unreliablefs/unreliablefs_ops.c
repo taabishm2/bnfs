@@ -108,8 +108,10 @@ int unreliable_getattr(const char *path, struct stat *buf)
     }
 
 	ret = AFS_getAttr(afsClient, path, buf);
-	if (ret < 0)
-		return -errno;
+	if (ret < 0) {
+        printf("unreliable_getattr failed %d\n", errno);
+		return ret;
+    }
 
     return 0;
 }
@@ -312,7 +314,7 @@ int unreliable_open(const char *path, struct fuse_file_info *fi)
     }
 
     // Open call to server.
-	ret = AFS_open(afsClient, path);
+	ret = AFS_open(afsClient, path, fi);
     if (ret < 0) {
         return -errno;
     }
