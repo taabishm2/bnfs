@@ -13,11 +13,18 @@ typedef struct AFSClient AFSClient;
 
 AFSClient* NewAFSClient();
 
-int AFS_open(AFSClient* client, const char* file_path, struct fuse_file_info *fi);
-
 int AFS_getAttr(AFSClient* client, const char* file_path, struct stat *buf);
 
+int AFS_readDir(AFSClient* client, const char *path, void *buf, fuse_fill_dir_t filler);
+
+int AFS_mkdir(AFSClient* client, const char* file_path);
+
+int AFS_rmdir(AFSClient* client, const char* file_path);
+
+int AFS_open(AFSClient* client, const char* file_path, struct fuse_file_info *fi);
+
 int AFS_close(AFSClient* v, const char* file_path);
+
 
 #ifdef __cplusplus
 }

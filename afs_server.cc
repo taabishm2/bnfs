@@ -18,6 +18,7 @@
 
 #include "afs.grpc.pb.h"
 
+using afs::BaseResponse;
 using afs::FileServer;
 using afs::OpenResp;
 using afs::OpenReq;
@@ -31,11 +32,19 @@ using grpc::ServerWriter;
 using grpc::Status;
 
 using namespace std;
-
 #define BUFSIZE 65500
 #define FS_ROOT "fs_root"
 #define CACHE "cache"
 std::string AFS_ROOT_DIR;
+
+char *getServerPath(string path)
+{
+    const std::string serverDirBasePath = "/afs_server_dir";
+    std::string fullPath = serverDirBasePath + path;
+    char *result = new char[fullPath.size() + 1];
+    std::strcpy(result, fullPath.c_str());
+    return result;
+}
 
 class FileServerServiceImpl final : public FileServer::Service
 {
@@ -78,27 +87,33 @@ class FileServerServiceImpl final : public FileServer::Service
     Status GetAttr(ServerContext *context, const SimplePathRequest *request,
                    StatResponse *reply) override
     {
-        cout << "Recieved GetAttr RPC from client!" << endl;
+        cout << "Recieved GetAttr RPC " << request->path().c_str() << " from client!" << endl;
 
         struct stat stbuf;
-        // int res = lstat(request->path().c_str, &stbuf);
-        int res = lstat("/testdir", &stbuf);
-        if (res == -1)
-            res = -errno;
+        int res = lstat(getServerPath(request->path()), &stbuf);
 
-        // Do this only if res is not error. also return res 
-        reply->set_dev(stbuf.st_dev);
-        reply->set_ino(stbuf.st_ino);
-        reply->set_mode(stbuf.st_mode);
-        reply->set_nlink(stbuf.st_nlink);
-        reply->set_rdev(stbuf.st_rdev);
-        reply->set_size(stbuf.st_size);
-        reply->set_blksize(stbuf.st_blksize);
-        reply->set_blocks(stbuf.st_blocks);
-        reply->set_atime(stbuf.st_atime);
-        reply->set_mtime(stbuf.st_mtime);
-        reply->set_ctime(stbuf.st_ctime);
-        
+        BaseResponse baseResponse;
+        if (res == -1)
+        {
+            baseResponse.set_errorcode(res);
+        }
+        else
+        {
+            reply->set_dev(stbuf.st_dev);
+            reply->set_ino(stbuf.st_ino);
+            reply->set_mode(stbuf.st_mode);
+            reply->set_nlink(stbuf.st_nlink);
+            reply->set_rdev(stbuf.st_rdev);
+            reply->set_size(stbuf.st_size);
+            reply->set_blksize(stbuf.st_blksize);
+            reply->set_blocks(stbuf.st_blocks);
+            reply->set_atime(stbuf.st_atime);
+            reply->set_mtime(stbuf.st_mtime);
+            reply->set_ctime(stbuf.st_ctime);
+            baseResponse.set_errorcode(0);
+        }
+
+        reply->mutable_baseresponse()->CopyFrom(baseResponse);
         return Status::OK;
     }
 
@@ -106,23 +121,37 @@ class FileServerServiceImpl final : public FileServer::Service
     Status ReadDir(ServerContext *context, const SimplePathRequest *request,
                    ReadDirResponse *reply)
     {
-
-        cout << "Recieved ReadDir RPC from client!" << endl;
         DIR *dp;
         int res = 0;
         struct dirent *de;
 
-        // dp = opendir(request->path().c_str());
-        dp = opendir("/testdir");
-        if (dp == NULL)
-            res = -errno;
+        dp = opendir(getServerPath(request->path()));
 
-        while ((de = readdir(dp)) != NULL)
+        BaseResponse baseResponse;
+        if (dp == NULL)
         {
-            reply->add_dirname(de->d_name);
+            baseResponse.set_errorcode(res);
+        }
+        else
+        {
+            while ((de = readdir(dp)) != NULL)
+                reply->add_dirname(de->d_name);
         }
 
         closedir(dp);
+
+        reply->mutable_baseresponse()->CopyFrom(baseResponse);
+        return Status::OK;
+    }
+
+    Status Mkdir(ServerContext *context, const SimplePathRequest *request,
+                 BaseResponse *reply)
+    {
+        int res = mkdir(getServerPath(request->path()), 00777);
+
+        if (res == -1)
+            reply->set_errorcode(res);
+            
         return Status::OK;
     }
 

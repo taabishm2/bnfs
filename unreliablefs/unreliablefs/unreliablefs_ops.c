@@ -93,29 +93,6 @@ int unreliable_lstat(const char *path, struct stat *buf)
     return 0;
 }
 
-int unreliable_getattr(const char *path, struct stat *buf)
-{
-    int ret = error_inject(path, OP_GETATTR);
-    if (ret == -ERRNO_NOOP) {
-        return 0;
-    } else if (ret) {
-        return ret;
-    }
-
-    memset(buf, 0, sizeof(struct stat));
-    if (lstat(path, buf) == -1) {
-        return -errno;
-    }
-
-	ret = AFS_getAttr(afsClient, path, buf);
-	if (ret < 0) {
-        printf("unreliable_getattr failed %d\n", errno);
-		return ret;
-    }
-
-    return 0;
-}
-
 int unreliable_readlink(const char *path, char *buf, size_t bufsiz)
 {
     int ret = error_inject(path, OP_READLINK);
@@ -151,23 +128,6 @@ int unreliable_mknod(const char *path, mode_t mode, dev_t dev)
     return 0;
 }
 
-int unreliable_mkdir(const char *path, mode_t mode)
-{
-    int ret = error_inject(path, OP_MKDIR);
-    if (ret == -ERRNO_NOOP) {
-        return 0;
-    } else if (ret) {
-        return ret;
-    }
-
-    ret = mkdir(path, mode);
-    if (ret == -1) {
-        return -errno;
-    }
-
-    return 0;
-}
-
 int unreliable_unlink(const char *path)
 {
     int ret = error_inject(path, OP_UNLINK);
@@ -178,23 +138,6 @@ int unreliable_unlink(const char *path)
     }
 
     ret = unlink(path); 
-    if (ret == -1) {
-        return -errno;
-    }
-
-    return 0;
-}
-
-int unreliable_rmdir(const char *path)
-{
-    int ret = error_inject(path, OP_RMDIR);
-    if (ret == -ERRNO_NOOP) {
-        return 0;
-    } else if (ret) {
-        return ret;
-    }
-
-    ret = rmdir(path); 
     if (ret == -1) {
         return -errno;
     }
@@ -583,6 +526,18 @@ int unreliable_opendir(const char *path, struct fuse_file_info *fi)
     return 0;    
 }
 
+int unreliable_getattr(const char *path, struct stat *buf)
+{
+    int ret = error_inject(path, OP_GETATTR);
+    if (ret == -ERRNO_NOOP) {
+        return 0;
+    } else if (ret) {
+        return ret;
+    }
+    
+	return AFS_getAttr(afsClient, path, buf);
+}
+
 int unreliable_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
                        off_t offset, struct fuse_file_info *fi)
 {
@@ -593,26 +548,31 @@ int unreliable_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
         return ret;
     }
 
-    DIR *dp = opendir(path);
-    if (dp == NULL) {
-	return -errno;
+	return AFS_readDir(afsClient, path, buf, filler);
+}
+
+int unreliable_mkdir(const char *path, mode_t mode)
+{
+    int ret = error_inject(path, OP_MKDIR);
+    if (ret == -ERRNO_NOOP) {
+        return 0;
+    } else if (ret) {
+        return ret;
     }
-    struct dirent *de;
 
-    (void) offset;
-    (void) fi;
+	return AFS_mkdir(afsClient, path);
+}
 
-    while ((de = readdir(dp)) != NULL) {
-        struct stat st;
-        memset(&st, 0, sizeof(st));
-        st.st_ino = de->d_ino;
-        st.st_mode = de->d_type << 12;
-        if (filler(buf, de->d_name, &st, 0))
-            break;
+int unreliable_rmdir(const char *path)
+{
+    int ret = error_inject(path, OP_RMDIR);
+    if (ret == -ERRNO_NOOP) {
+        return 0;
+    } else if (ret) {
+        return ret;
     }
-    closedir(dp);
 
-    return 0;
+    return AFS_rmdir(afsClient, path);
 }
 
 int unreliable_releasedir(const char *path, struct fuse_file_info *fi)

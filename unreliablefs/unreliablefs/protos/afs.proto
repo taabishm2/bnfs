@@ -6,7 +6,14 @@ package afs;
 
 // Interface exported by the server.
 service FileServer {
+
   rpc GetAttr(SimplePathRequest) returns (StatResponse) {}
+
+  rpc ReadDir(SimplePathRequest) returns (ReadDirResponse) {}
+
+  rpc Mkdir(SimplePathRequest) returns (BaseResponse) {}
+
+  rpc Rmdir(SimplePathRequest) returns (BaseResponse) {}
 
   // File operations
   rpc Open(OpenReq) returns (stream OpenResp) {}
@@ -40,11 +47,12 @@ message StatResponse {
   uint64     blksize 		= 8; 	  /* blocksize for file system I/O */
   uint64     blocks 		= 9;  	/* number of 512B blocks allocated */
   uint64     atime 		  = 10;   /* time of last access */
-  uint64     atimens		= 11;
-  uint64     mtime		  = 12;   /* time of last modification */
-  uint64     mtimens		= 13;
-  uint64     ctime		  = 14;   /* time of last status change */
-  uint64     ctimens		= 15;
+  uint64     mtime		  = 11;   /* time of last modification */
+  uint64     ctime		  = 12;   /* time of last status change */
+  uint64     uid        = 13;
+  uint64     gid        = 14;
+
+  BaseResponse baseresponse = 15;
 }
 
 // TODO: make it streaming application.
@@ -65,4 +73,17 @@ message DeleteReq {
 
 message DeleteResp {
   int32 err = 1;
+}
+
+message ReadDirResponse {
+  repeated string dirName = 1;
+  BaseResponse baseresponse = 2;
+}
+
+message BaseResponse {
+  uint64 errorcode = 1;
+  string errormessage = 2;
+}
+
+message Empty {
 }

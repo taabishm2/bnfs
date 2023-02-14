@@ -10,6 +10,8 @@ service FileServer {
 
   rpc ReadDir(SimplePathRequest) returns (ReadDirResponse) {}
 
+  rpc Mkdir(SimplePathRequest) returns (BaseResponse) {}
+
 }
 
 
@@ -44,8 +46,19 @@ message StatResponse {
   uint64     mtimens		= 13;
   uint64     ctime		  = 14;   /* time of last status change */
   uint64     ctimens		= 15;
+
+  BaseResponse baseresponse = 16;
 }
 
 message ReadDirResponse {
   repeated string dirName = 1;
+  BaseResponse baseresponse = 2;
+}
+
+message BaseResponse {
+  uint64 errorcode = 1;
+  string errormessage = 2;
+}
+
+message Empty {
 }

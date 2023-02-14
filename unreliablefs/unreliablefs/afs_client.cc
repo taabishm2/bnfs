@@ -44,7 +44,8 @@ using afs::OpenReq;
 using afs::OpenResp;
 using afs::PutFileReq;
 using afs::PutFileResp;
-// using afs::ReadDirResponse;
+using afs::ReadDirResponse;
+using afs::BaseResponse;
 using afs::SimplePathRequest;
 using afs::StatResponse;
 using grpc::Channel;
@@ -62,6 +63,90 @@ struct AFSClient
     : stub_(FileServer::NewStub(
       grpc::CreateChannel("localhost:50051",
       grpc::InsecureChannelCredentials()))), cache_root(cache_root) {}
+
+	int getAttr(const char *fileName, struct stat *stbuf)
+	{
+
+		SimplePathRequest request;
+		request.set_path(fileName);
+
+		StatResponse reply;
+		ClientContext context;
+
+		cout << "Client getAttr called" << endl;
+
+		Status status = stub_->GetAttr(&context, request, &reply);
+
+		if (status.ok())
+		{
+			stbuf->st_dev = reply.dev();
+			stbuf->st_ino = reply.ino();
+			stbuf->st_mode = reply.mode();
+			stbuf->st_nlink = reply.nlink();
+			stbuf->st_rdev = reply.rdev();
+			stbuf->st_size = reply.size();
+			stbuf->st_blksize = reply.blksize();
+			stbuf->st_blocks = reply.blocks();
+			stbuf->st_atime = reply.atime();
+			stbuf->st_mtime = reply.mtime();
+			stbuf->st_ctime = reply.ctime();
+		}
+
+    cout << "** CLIENT GOT FOR getATTR: " << reply.baseresponse().errorcode() << endl;
+		int res = reply.baseresponse().errorcode();
+    cout << "** FINAL CLIENT GOT FOR getATTR: " << res << endl;
+    return res;
+	}
+
+	int readDir(const char *fileName, const char *path, void *buf, fuse_fill_dir_t filler)
+	{
+
+    ClientContext context;
+    ReadDirResponse reply;
+		SimplePathRequest request;
+		request.set_path(fileName);
+
+		Status status = stub_->ReadDir(&context, request, &reply);
+		int res = reply.baseresponse().errorcode();
+
+    if (res == -1) return res;
+
+    for (int i = 0; i < reply.dirname_size(); i++)
+      if (filler(buf, reply.dirname(i).c_str(), NULL, 0) != 0)
+        return -ENOMEM;
+
+		return 0;
+	}
+
+	int mkdir(const char *fileName)
+	{
+    ClientContext context;
+    BaseResponse reply;
+		SimplePathRequest request;
+		request.set_path(fileName);
+
+		Status status = stub_->Mkdir(&context, request, &reply);
+    cout << "** FINAL mkdir RETURN: " << reply.errorcode() << endl;
+    
+		int res = reply.errorcode();
+    if (res != 0) { res = reply.errorcode(); }
+    return res;
+	}
+
+int rmdir(const char *fileName)
+	{
+    ClientContext context;
+    BaseResponse reply;
+		SimplePathRequest request;
+		request.set_path(fileName);
+
+		Status status = stub_->Rmdir(&context, request, &reply);
+    cout << "** FINAL rmdir RETURN: " << reply.errorcode() << endl;
+    
+		int res = reply.errorcode();
+    if (res != 0) { res = -errno; }
+    return res;
+	}
 
   int Open(const char* path, struct fuse_file_info *fi)
   {
@@ -129,43 +214,6 @@ struct AFSClient
 
     return 0;
   }
-
-  int GetAttr(const char* fileName, struct stat *stbuf)
-	{
-		SimplePathRequest request;
-		request.set_path(fileName);
-
-		StatResponse reply;
-		ClientContext context;
-
-		Status status = stub_->GetAttr(&context, request, &reply);
-    cout << "[log] client getAttr called" << endl;
-
-		if (status.ok())
-		{
-			stbuf->st_dev = reply.dev();
-			stbuf->st_ino = reply.ino();
-			stbuf->st_mode = reply.mode();
-			stbuf->st_nlink = reply.nlink();
-			stbuf->st_rdev = reply.rdev();
-			stbuf->st_size = reply.size();
-			stbuf->st_blksize = reply.blksize();
-			stbuf->st_blocks = reply.blocks();
-			stbuf->st_atime = reply.atime();
-			stbuf->st_mtime = reply.mtime();
-			stbuf->st_ctime = reply.ctime();
-
-      cout << "[log] ctime is " << reply.ctime() << endl;
-		} else {
-
-      cout << "stub call failed" << endl;
-      return -1;
-    }
-
-		return 0;
-	}
-
-
 
   int Close(const char* file_path)
   {
@@ -254,13 +302,24 @@ int AFS_open(AFSClient* client, const char* file_path, struct fuse_file_info *fi
   return client -> Open(file_path, fi);
 }
 
-int AFS_getAttr(AFSClient* client, 
-    const char* file_path, struct stat *buf) {
-  return client -> GetAttr(file_path, buf);
-}
-
 int AFS_close(AFSClient* client, const char* file_path) {
   return client -> Close(file_path);
+}
+
+int AFS_getAttr(AFSClient* client, const char* file_path, struct stat *buf) {
+  return client -> getAttr(file_path, buf);
+}
+
+int AFS_readDir(AFSClient* client, const char *path, void *buf, fuse_fill_dir_t filler) {
+  return client -> readDir(path, path, buf, filler);
+}
+
+int AFS_mkdir(AFSClient* client, const char* file_path) {
+  return client -> mkdir(file_path);
+}
+
+int AFS_rmdir(AFSClient* client, const char* file_path) {
+  return client -> rmdir(file_path);
 }
 
 }
