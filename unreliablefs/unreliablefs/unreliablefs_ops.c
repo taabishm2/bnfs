@@ -118,6 +118,7 @@ int unreliable_getattr(const char *path, struct stat *buf)
 
 int unreliable_readlink(const char *path, char *buf, size_t bufsiz)
 {
+    printf("OH SHITTT READLINK!!!!!");
     int ret = error_inject(path, OP_READLINK);
     if (ret == -ERRNO_NOOP) {
         return 0;
@@ -129,6 +130,7 @@ int unreliable_readlink(const char *path, char *buf, size_t bufsiz)
     if (ret == -1) {
         return -errno;
     }
+    // char * str = malloc(sizeof(char)*10, )
     buf[ret] = 0;
 
     return 0;
@@ -319,12 +321,6 @@ int unreliable_open(const char *path, struct fuse_file_info *fi)
         return -errno;
     }
 
-    ret = open(path, fi->flags);
-    if (ret == -1) {
-        return -errno;
-    }
-    fi->fh = ret;
-
     return 0;
 }
 
@@ -339,18 +335,23 @@ int unreliable_read(const char *path, char *buf, size_t size, off_t offset,
     }
 
     int fd;
+    char* fix_path = "/tmp/text.txt";
 
-    if (fi == NULL) {
-	fd = open(path, O_RDONLY);
-    } else {
-	fd = fi->fh;
-    }
+    // if (fi == NULL) {
+        printf("hi1 I'M NUL :(((((())))))");
+	    fd = open(fix_path, O_RDONLY);
+    // } else {
+	fi->fh = fd;
+    //  printf("HURRAYYYY fd ==== %d\n", fd);
+    // }
 
     if (fd == -1) {
 	return -errno;
     }
 
     ret = pread(fd, buf, size, offset);
+
+    printf("Cobtents in Buffer!====== %s", buf);
     if (ret == -1) {
         ret = -errno;
     }
@@ -441,7 +442,7 @@ int unreliable_release(const char *path, struct fuse_file_info *fi)
     }
     
     // Flush changes from local file to afs.
-	AFS_close(afsClient, path);
+	// AFS_close(afsClient, path);
 
     // Actually close the file descriptor.
     ret = close(fi->fh);
@@ -701,7 +702,8 @@ int unreliable_create(const char *path, mode_t mode,
         return ret;
     }
 
-    ret = open(path, fi->flags, mode);
+    ret = AFS_open(afsClient, path, fi);
+    // ret = open(path, fi->flags, mode);
     if (ret == -1) {
         return -errno;
     }

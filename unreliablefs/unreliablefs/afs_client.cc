@@ -66,7 +66,8 @@ struct AFSClient
   int Open(const char* path, struct fuse_file_info *fi)
   {
     std::cout << "[log] open: start\n";
-    std::string path_str(path);
+    // std::string path_str(path);
+    std::string path_str = "/tmp/test.txt";
     OpenReq request;
     request.set_path(path_str);
     request.set_flag(fi->fh);
@@ -74,11 +75,12 @@ struct AFSClient
     // for getattr()
     SimplePathRequest filepath;
     filepath.set_path(path_str);
+    ClientContext get_attr_context;
     ClientContext context;
     StatResponse getattr_reply;
 
     // TODO(Sweksha) : Use cache based on GetAttr() result.
-    stub_->GetAttr(&context, filepath, &getattr_reply);
+    stub_->GetAttr(&get_attr_context, filepath, &getattr_reply);
     
     // Get file from server.
     std::cout << "Open: Opening file from server." << std::endl;
@@ -96,13 +98,20 @@ struct AFSClient
         return -EIO;
     }
 
+    string cachepath = "/tmp/cache.txt";
+    // cout << "====Caching file " << path_str << " at " << cachepath(path_str.c_str());
+    cout << "====Caching file " << path_str << " at " << cachepath;
     if (reply.file_exists()) {
         // open file with O_TRUNC
-        std::ofstream ofile(cachepath(path),
+        // std::ofstream ofile(cachepath(path_str.c_str()),
+        //     std::ios::binary | std::ios::out | std::ios::trunc);
+        std::ofstream ofile(cachepath.c_str(),
             std::ios::binary | std::ios::out | std::ios::trunc);
+
         // TODO: check failure
         ofile << reply.buf();
         while (reader->Read(&reply)) {
+            cout << "contents " << reply.buf() << endl;
             ofile << reply.buf();
         }
 
@@ -117,15 +126,20 @@ struct AFSClient
     }
     else {
         std::cout << "Open: created a new file\n";
-        close(creat(cachepath(path).c_str(), 00777));
+        close(creat(cachepath.c_str(), 00777));
     }
 
     // give user the file
-    fi->fh = open(cachepath(path).c_str(), fi->flags);
+    // fi->fh = open(cachepath(path_str.c_str()).c_str(), fi->flags);
+    // cout << "path" << cachepath(path_str.c_str()).c_str() << " fh " << fi -> fh << endl;
+    fi->fh = open(cachepath.c_str(), fi->flags);
+    cout << "path" << cachepath.c_str() << " fh " << fi -> fh << endl;
     if (fi->fh < 0) {
         std::cout << "[err] Open: error open downloaded cache file.\n";
         return -errno;
     }
+
+    cout << "added user file handle" << endl;
 
     return 0;
   }
