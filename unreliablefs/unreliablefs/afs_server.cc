@@ -45,7 +45,7 @@ std::string AFS_ROOT_DIR;
 
 char *getServerPath(string path)
 {
-    const std::string serverDirBasePath = "/afs_server_dir";
+    const std::string serverDirBasePath = "/users/chrahul5/afs_server_dir";
     std::string fullPath = serverDirBasePath + path;
     char *result = new char[fullPath.size() + 1];
     std::strcpy(result, fullPath.c_str());
@@ -116,11 +116,14 @@ class FileServerServiceImpl final : public FileServer::Service
     Status Mkdir(ServerContext *context, const SimplePathRequest *request,
                  BaseResponse *reply)
     {
+        cout << "SERVER: Mkdir " << request->path().c_str() << endl;
+
         int res = mkdir(getServerPath(request->path()), 777);
 
         if (res == -1)
             reply->set_errorcode(-errno);
 
+        cout << "SERVER: Response errno " << -errno << endl;
         return Status::OK;
     }
 

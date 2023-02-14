@@ -126,11 +126,13 @@ struct AFSClient
 		request.set_path(fileName);
 
 		Status status = stub_->Mkdir(&context, request, &reply);
-    cout << "** FINAL mkdir RETURN: " << reply.errorcode() << endl;
+    int res = reply.errorcode();
     
-		int res = reply.errorcode();
-    if (res != 0) { res = reply.errorcode(); }
-    return res;
+    cout << "CLIENT: mkdir GOT: " << reply.errorcode() << endl;
+    cout << "CLIENT: FINAL mkdir GOT: " << res << endl;
+    
+    if (res < 0) { return res; }
+    return 0;
 	}
 
 int rmdir(const char *fileName)
@@ -141,11 +143,13 @@ int rmdir(const char *fileName)
 		request.set_path(fileName);
 
 		Status status = stub_->Rmdir(&context, request, &reply);
-    cout << "** FINAL rmdir RETURN: " << reply.errorcode() << endl;
+    int res = reply.errorcode();
     
-		int res = reply.errorcode();
-    if (res != 0) { res = -errno; }
-    return res;
+    cout << "CLIENT: rmdir GOT: " << reply.errorcode() << endl;
+    cout << "CLIENT: FINAL rmdir GOT: " << res << endl;
+
+    if (res < 0) { return res; }
+    return 0;
 	}
 
   int Open(const char* path, struct fuse_file_info *fi)
