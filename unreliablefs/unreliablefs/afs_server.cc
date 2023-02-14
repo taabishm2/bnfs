@@ -79,7 +79,8 @@ class FileServerServiceImpl final : public FileServer::Service
         OpenResp reply;
         // string path = request->path();
         // TOD0(Sweksha) : Use getServerFilepath
-       string path = getServerFilepath(request->path());
+      //  string path = getServerFilepath(request->path());
+      string path = request->path();
        ifstream file(path,ios::in);
         cout << "Opening: " << path << "\n";
 
@@ -88,20 +89,37 @@ class FileServerServiceImpl final : public FileServer::Service
             writer->Write(reply);
             return Status::OK;
         }
+
+        cout << "====setting file exists true\n";
         reply.set_file_exists(true);
 
        string buf(BUFSIZE, '\0');
-        while (file.read(&buf[0], BUFSIZE)) {
-            reply.set_buf(buf);
-            if (!writer->Write(reply))
-                break;
+        // while (file.read(&buf[0], BUFSIZE)) {
+        //     cout << "1111 file contents " << buf << endl;
+        //     reply.set_buf(buf);
+        //     if (!writer->Write(reply)) {
+        //         break;
+        //     }
+        // }
+        // // reached eof
+        // if (file.eof()) {
+        //   cout << "222 EOF file contents " << buf << endl;
+        //     buf.resize(file.gcount());
+        //     reply.set_buf(buf);
+        //     writer->Write(reply);
+        // }
+
+        while (!file.eof()) {
+          file.read(&buf[0], BUFSIZE);
+          reply.set_buf(buf);
+          writer->Write(reply);
         }
-        // reached eof
-        if (file.eof()) {
+
+        file.read(&buf[0], BUFSIZE);
             buf.resize(file.gcount());
             reply.set_buf(buf);
             writer->Write(reply);
-        }
+
         file.close();
         // reply.set_err(read_res);
         return Status::OK;
@@ -110,9 +128,9 @@ class FileServerServiceImpl final : public FileServer::Service
   Status PutFile(ServerContext *context, const PutFileReq *request,
         PutFileResp *reply) override
   {
-    cout << "Recieved PutFile RPC from client!" << endl;
-    cout << "File name: " << request->path() << " contents\n" <<
-      request -> contents() << endl;
+    // cout << "Recieved PutFile RPC from client!" << endl;
+    // cout << "File name: " << request->path() << " contents\n" <<
+    //   request -> contents() << endl;
 
     reply->set_err(0);
     return Status::OK;
