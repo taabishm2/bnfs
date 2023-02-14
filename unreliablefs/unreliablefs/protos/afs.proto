@@ -10,7 +10,7 @@ service FileServer {
 
   // File operations
   rpc Open(OpenReq) returns (stream OpenResp) {}
-  rpc PutFile(PutFileReq) returns (PutFileResp) {} 
+  rpc PutFile(stream PutFileReq) returns (PutFileResp) {} 
   rpc Delete(DeleteReq) returns (DeleteResp) {}
 }
 
@@ -47,11 +47,10 @@ message StatResponse {
   uint64     ctimens		= 15;
 }
 
-// TODO: make it streaming application.
 message PutFileReq {
   string path = 1;
 
-  // File content.
+  // File contents.
   bytes contents = 2;
 }
 

@@ -28,9 +28,11 @@ using afs::DeleteResp;
 using afs::SimplePathRequest;
 using afs::StatResponse;
 // using afs::ReadDirResponse;
+
 using grpc::Server;
 using grpc::ServerBuilder;
 using grpc::ServerContext;
+using grpc::ServerReader;
 using grpc::ServerWriter;
 using grpc::Status;
 
@@ -125,12 +127,14 @@ class FileServerServiceImpl final : public FileServer::Service
         return Status::OK;
     }
 
-  Status PutFile(ServerContext *context, const PutFileReq *request,
-        PutFileResp *reply) override
-  {
-    // cout << "Recieved PutFile RPC from client!" << endl;
-    // cout << "File name: " << request->path() << " contents\n" <<
-    //   request -> contents() << endl;
+  Status PutFile(ServerContext *context, ServerReader<PutFileReq> *reader,
+        PutFileResp *reply) override {
+    PutFileReq request;
+
+    while (reader->Read(&request)) {
+      cout << "got request with path " << request.path() <<
+       " contents " << request.contents() << endl;
+    }
 
     reply->set_err(0);
     return Status::OK;

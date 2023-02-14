@@ -49,9 +49,12 @@ using afs::SimplePathRequest;
 using afs::StatResponse;
 using grpc::Channel;
 using grpc::ClientContext;
+using grpc::ClientWriter;
 using grpc::Status;
 
 using namespace std;
+
+#define BUFSIZE 65500
 
 extern "C" {
 
@@ -183,38 +186,48 @@ struct AFSClient
 
   int Close(const char* file_path)
   {
-    // Read file from local cache, if present.
-    int fd = open(file_path, O_RDONLY);
-      if (fd == -1)
-        return -errno;
+    // // Read file from local cache, if present.
+    // int fd = open(file_path, O_RDONLY);
+    //   if (fd == -1)
+    //     return -errno;
 
-    int size = 1000; // TODO: read and put file in chunks using streaming.
-    char* buf = (char*) malloc(sizeof(char) * (size + 1));
-    int res = pread(fd, buf, size, 0);
-    if (res == -1)
-      return -errno;
+    // Read file from cache and make gRPC put file writes.
+    ifstream file(file_path, ios::in);
+    cout << "Put file path: " << file_path << "\n";
 
     // Prepare grpc messages.
+    ClientContext context;
     PutFileReq request;
     PutFileResp reply;
-    ClientContext context;
 
-    request.set_path(file_path);
-    request.set_contents(buf);
+    std::unique_ptr<ClientWriter<PutFileReq>> writer(stub_->PutFile(&context, &reply));
 
-    Status status = stub_->PutFile(&context, request, &reply);
+    string buf(BUFSIZE, '\0');
+    while (!file.eof()) {
+      // Read file contents into buf.
+      file.read(&buf[0], BUFSIZE);
 
-    if (status.ok())
-    {
-      cout << "[log] AFS file contents sent " << request.contents() << endl;
-      return 0;
+      request.set_path(file_path);
+      request.set_contents(buf);
+
+      if (!writer->Write(request)) {
+          // Broken stream.
+          break;
+      }
     }
-    else
-    {
-      cout << status.error_code() << ": " << status.error_message()
-         << endl;
-      return -errno;
+    
+    writer->WritesDone();
+    Status status = writer->Finish();
+    
+    if (!status.ok()) {
+      cout << "PutFi8le rpc failed: " << status.error_message() << std::endl;
+      return -1;
     }
+    else {
+      cout << "Finished sending file with path " << file_path << endl;
+    }
+
+    return 0;
   }
 
   std::string cachepath(const char* rel_path) {
