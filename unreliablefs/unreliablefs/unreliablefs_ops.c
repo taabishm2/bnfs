@@ -21,6 +21,7 @@
 // #define AFS_CLIENT ()
 
 #include "unreliablefs_ops.h"
+#include "cache_helper.h"
 
 const char *fuse_op_name[] = {
     "getattr",
@@ -73,6 +74,7 @@ const char *fuse_op_name[] = {
 };
 
 struct AFSClient* afsClient;
+struct ClientHelper* clientHelper;
 
 extern int error_inject(const char* path, fuse_op operation);
 
@@ -535,6 +537,8 @@ int unreliable_getattr(const char *path, struct stat *buf)
         return ret;
     }
     
+    CH_initCache();
+    printf("Complete initCache\n");
 	return AFS_getAttr(afsClient, path, buf);
 }
 
@@ -547,7 +551,7 @@ int unreliable_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
     } else if (ret) {
         return ret;
     }
-
+    
 	return AFS_readDir(afsClient, path, buf, filler);
 }
 

@@ -12,6 +12,8 @@
 
 #include "unreliablefs_ops.h"
 #include "unreliablefs.h"
+#include "cache_helper.h"
+
 
 extern struct err_inj_q *config_init(const char* conf_path);
 extern void config_delete(struct err_inj_q *config);
@@ -176,6 +178,7 @@ int main(int argc, char *argv[])
 
     // Initialize afs client.
     afsClient = NewAFSClient("/");
+    cacheHelper = NewCacheHelper();
 
     fprintf(stdout, "starting FUSE filesystem unreliablefs\n");
     int ret = fuse_main(args.argc, args.argv, &unreliable_ops, NULL);
