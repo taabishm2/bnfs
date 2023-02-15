@@ -163,7 +163,7 @@ extern "C"
             bool file_exists_in_cache = getCheckInCache(path, file_descriptor, false, open_mode);
 
             if (!file_exists_in_cache)
-                return false;
+                return true;
 
             struct stat file_stat;
             fstat(*file_descriptor, &file_stat);

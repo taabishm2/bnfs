@@ -153,105 +153,105 @@ int rmdir(const char *fileName)
   {
     std::cout << "[log] open: start\n";
     std::string path_str(path);
+
+    // Check if a temp file exists for the file trying to be opened.
+    int temp_fd = -1;
+    if (getCheckInTemp(path, temp_fd, false, O_RDONLY, false))
+    {
+      // Another client has written dirty data to this file. Reject open() in
+      // this case.
+      // Input/output error?
+      return -EIO;
+    }
+
     OpenReq request;
+    ClientContext open_context;
     request.set_path(path_str);
     request.set_flag(fi->flags);
     request.set_is_create(is_create);
 
-    // for getattr()
+    // for getattr(). TODO: Use getattr only if there is a cached copy.
     SimplePathRequest filepath;
     filepath.set_path(path_str);
     ClientContext getattr_context;
-    ClientContext open_context;
     StatResponse getattr_reply;
 
-    string cachepath = "/tmp/cache_new.txt";
+    string cachepath = getCachePath(path);
+    // If cache is valid, cache valid must be updated to a positive number.
+    int cache_fd = -1;
+    bool use_cache = false;
 
-    // TODO(Sweksha) : Use cache based on GetAttr() result.
-    // stub_->GetAttr(&getattr_context, filepath, &getattr_reply);
+    // Use cached file based on GetAttr() result or if it absent in cache.
+    Status getattr_status =
+      stub_->GetAttr(&getattr_context, filepath, &getattr_reply);
+    
+    if (getattr_status.ok()) {
+			use_cache = !(isCacheOutOfDate(path, getattr_reply.mtime(), &cache_fd, false));
+		}
     
     // Get file from server.
-    std::cout << "Open: Opening file from server." << std::endl;
-    
-    OpenResp reply;
+    if (!use_cache || cache_fd < 0) {
+      std::cout << "Open: Opening file from server." << std::endl;
+      
+      OpenResp reply;
+      std::unique_ptr<grpc::ClientReader<OpenResp> > reader(
+          stub_->Open(&open_context, request));
+   
+      // Read the stream from server. 
+      if (!reader->Read(&reply)) {
+          std::cout << "[err] Open: failed to download file: " << path_str
+                    << " from server." << std::endl;
+          return -EIO;
+      }
 
-    std::unique_ptr<grpc::ClientReader<OpenResp> > reader(
-        stub_->Open(&open_context, request));
+      string buf = std::string();
+      if (is_create) {
+          // New file created. Update/create the cached copy.
+          cache_fd = syncFileServerToCache(path, buf.c_str(), false, O_CREAT);
+          std::cout << "Open: created a new cache file with fd: " << cache_fd << "\n";
+      } else if (reply.file_exists()) {
+          cout << "Open: file found on the server";
+          // open file with O_TRUNC 
+          buf += reply.buf();
+          while (reader->Read(&reply)) {
+              buf += reply.buf();
+          }
 
-    
-    // Read the stream from server. 
-    if (!reader->Read(&reply)) {
-        std::cout << "[err] Open: failed to download file: " << path_str
-                  << " from server." << std::endl;
-        return -EIO;
-    }
+          Status status = reader->Finish();
+          if (!status.ok()) {
+              std::cout << "[err] Open: failed to download from server. \n";
+              return -EIO;
+          }
+          cout << " ======" <<  buf;
 
-    // if (reply.file_exists()) {
-    //   string buf = std::string();
-    //   // buf.reserve(size);
-    //   cout << "file exists!!!=====";
-    //     // open file with O_TRUNC
-        
-    //    buf += reply.buf();
-    //     while (reader->Read(&reply)) {
-    //         buf += reply.buf();
-    //     }
-
-    //     Status status = reader->Finish();
-    //     cout << "reader finished!!!=====";
-    //     if (!status.ok()) {
-    //         std::cout << "[err] Open: failed to download from server." << std::endl;
-    //         return -EIO;
-    //     }
-    //     cout << "BROOOOOOO BUF ======" <<  buf;
-
-    //     std::cout << "Open: finish download from server\n";
-    // }
-
-    if (reply.file_exists()) {
-      cout << "file exists!!!=====";
-        // open file with O_TRUNC
-        std::ofstream ofile(cachepath,
-            std::ios::binary | std::ios::out | std::ios::trunc);
-            // std::ofstream ofile(cachepath(path),
-            // std::ios::binary | std::ios::out | std::ios::trunc);
-        // TODO: check failure
-        ofile << reply.buf();
-        while (reader->Read(&reply)) {
-            ofile << reply.buf();
-        }
-
-        Status status = reader->Finish();
-        cout << "reader finished!!!=====";
-        if (!status.ok()) {
-            std::cout << "[err] Open: failed to download from server." << std::endl;
-            return -EIO;
-        }
-        ofile.close(); // the cache is persisted
-
-        std::cout << "Open: finish download from server\n";
-    }
-    else {
-        std::cout << "Open: created a new file\n";
-        // close(creat(cachepath(path).c_str(), 00777));
-        int new_fd = creat(cachepath.c_str(), 00777);
-
-        cout << "NEW CACHE FILE FD=== " << new_fd;
-        close(new_fd);
+          std::cout << "Open: finish download from server \n";
+      } else {
+          // Opened(not create) a file not present on server.
+          getCheckInTemp(path, temp_fd, false, O_CREAT, true) ;
+          std::cout << "Open: created a new temp file with fd " << temp_fd << "\n";
+      }
     }
 
     // give user the file
     // fi->fh = open(cachepath(path).c_str(), fi->flags);
-    cout << "==== before OPEN LOCAL TO cachepath: " << cachepath;
-    int ret = open(cachepath.c_str(), fi->flags);
-    if (ret < 0) {
-        std::cout << "[err] Open: error open downloaded cache file.\n";
-        return -errno;
+    // cout << "==== before OPEN LOCAL TO cachepath: " << cachepath;
+    // int ret = open(cachepath.c_str(), fi->flags);
+    // if (ret < 0) {
+    //     std::cout << "[err] Open: error open downloaded cache file.\n";
+    //     return -errno;
+    // }
+
+    if (temp_fd > -1) {
+      fi->fh = temp_fd;
+      return temp_fd;
+      cout << "==== == AFTER OPEN fd RETURNING===== " << fi->fh;
+    } else if {
+      fi->fh = cache_fd;
+      return cache_fd;
     }
-
-    cout << "==== cachepath: " << cachepath << " AFTER fd " << fi->fh;
-
-    return ret;
+      std::cout << "[err] Open: error open downloaded cache file.\n";
+      return -1;
+    cout << "==== == AFTER OPEN fd RETURNING===== " << fi->fh;
   }
 
   int Close(const char* file_path) {
