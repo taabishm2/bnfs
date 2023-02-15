@@ -12,16 +12,16 @@
 #include <sys/stat.h>
 #include <fstream>
 #include <vector>
+#include <cstdlib>
+#include <unordered_set>
+#include <chrono>
+#include <sys/time.h>
 
 using namespace ::std;
 
 static const string CLIENT_DIR_ROOT = "/users/chrahul5/bnfs_client";
 
-bool fileExists(const string &path)
-{
-    ifstream file(path);
-    return file.good();
-}
+static std::unordered_set<string> dirty_files = {};
 
 string getCachePath(void)
 {
@@ -93,12 +93,13 @@ string getTempPath(const char *rel_path)
     return getTempPath() + "/" + getHashedPath(rel_path);
 }
 
+/* Don't pass O_CREAT as open mode, only use for read/write*/
 bool getCheckInCache(const char *path, int *file_descriptor, bool close_file, int open_mode)
 {
     string cache_path = getCachePath(path);
     *file_descriptor = open(cache_path.c_str(), open_mode);
 
-    if (file_descriptor >= 0)
+    if (*file_descriptor >= 0)
     {
         if (close_file)
             close(*file_descriptor);
@@ -107,17 +108,45 @@ bool getCheckInCache(const char *path, int *file_descriptor, bool close_file, in
     return false;
 }
 
-bool getCheckInTemp(const char *path, int *file_descriptor, bool close_file, int open_mode)
+bool getCheckInTemp(const char *path, int *file_descriptor, bool close_file, int open_mode, bool create_new)
 {
     string temp_path = getTempPath(path);
-    *file_descriptor = open(temp_path.c_str(), open_mode);
+    string cache_path = getCachePath(path);
+    *file_descriptor = open(temp_path.c_str(), O_RDONLY | open_mode);
 
-    if (file_descriptor >= 0)
+    if (*file_descriptor == -1 && create_new)
+    {
+        int cache_file_fd;
+        bool is_cached = getCheckInCache(path, &cache_file_fd, true, O_RDONLY);
+
+        if (is_cached)
+        {
+            string cp_command = "cp -f " + cache_path + " " + temp_path;
+            int status = system(cp_command.c_str());
+
+            if (status == -1)
+                return false;
+
+            if (WIFEXITED(status))
+            {
+                int exit_status = WEXITSTATUS(status);
+                if (exit_status != 0)
+                {
+                    cerr << "Failed to copy file cache->temp: " << path << endl;
+                    return false;
+                }
+            }
+        }
+        *file_descriptor = open(temp_path.c_str(), O_CREAT | open_mode, 0777);
+    }
+
+    if (*file_descriptor >= 0)
     {
         if (close_file)
             close(*file_descriptor);
         return true;
     }
+
     return false;
 }
 
@@ -141,28 +170,73 @@ bool isCacheOutOfDate(const char *path, int server_modified_at_epoch, int *file_
 }
 
 /* Returns file descriptor of cache file */
-int syncFileServerToCache(const char *path, const vector<char> &data, bool close_file, int open_mode)
+int syncFileServerToCache(const char *path, const string data, bool close_file, int open_mode)
 {
     string cache_path = getCachePath(path);
     ofstream file(cache_path, std::ios::binary);
     if (!file.is_open())
     {
         cerr << "Failed to sync file: " << path << endl;
-        return;
+        return -1;
     }
 
     file.write(data.data(), data.size());
     file.close();
-    
-    int file_descriptor;
+
+    int file_descriptor = -1;
     if (!close_file)
         file_descriptor = open(cache_path.c_str(), open_mode);
-    
+
     return file_descriptor;
 }
 
-void commitToCache(const char *path) {
-    // copy from temp to cache
+bool setFileModifiedTime(const char *path, int epochTime)
+{
+    struct timeval times[2];
+    times[1].tv_sec = epochTime;
+    times[1].tv_usec = 0;
+
+    if (utimes(path, times) == -1) {
+     cout << "It failed " << errno << endl;
+        return false;
+    }
+
+    cout << "It works" << endl;
+    return true;
+}
+
+/* Returns status: 0 is success, else failure */
+int commitToCache(const char *path, int server_modified_at_epoch)
+{
+    string temp_path = getTempPath(path);
+    string cache_path = getCachePath(path);
+
+    int temp_file_fd = open(temp_path.c_str(), O_RDWR);
+    if (temp_file_fd == -1)
+        return 1;
+
+    string cp_command = "cp -f " + temp_path + " " + cache_path;
+    int status = system(cp_command.c_str());
+
+    if (status == -1)
+        return 1;
+
+    if (WIFEXITED(status))
+    {
+        int exit_status = WEXITSTATUS(status);
+        if (exit_status != 0)
+            return 1;
+    }
+
+    cout << "Changing time of " << temp_path << endl;
+    setFileModifiedTime(temp_path.c_str(), server_modified_at_epoch);
+    cout << "Changing time of " << cache_path << endl;
+    setFileModifiedTime(cache_path.c_str(), server_modified_at_epoch);
+
+    dirty_files.erase(getHashedPath(path));
+    cout << "dirty_files" << endl;
+
+    return 0;
 }
 
 void initCache()
@@ -173,12 +247,71 @@ void initCache()
     cleanTempDir();
 }
 
+bool canOpenFile(const char *path)
+{
+    return !(dirty_files.find(getHashedPath(path)) != dirty_files.end());
+}
+
+void markFileDirty(const char *path)
+{
+    dirty_files.insert(getHashedPath(path));
+}
+
 int main()
 {
+    /* Tested */
     initCache();
-    cout << getCachePath("abc") << endl;
-    cout << getTempPath("abc") << endl;
-    cout << getTempPath("def") << endl;
-    cout << "Client setup completed!" << endl;
+
+    /* Tested */
+    cout << getCachePath("/dirname/test1.txt") << endl;
+
+    /* Tested */
+    cout << "A" << endl;
+    syncFileServerToCache("/dirname/abc.txt", "hello world\nthis is a file\n", true, O_RDONLY);
+
+    /* Tested */
+    cout << "B" << endl;
+    syncFileServerToCache("/dirname/abc.txt", "Hey new changes!\n", true, O_RDONLY);
+
+    /* Tested */
+    cout << "C" << endl;
+    int fd;
+    string tmp_txt = "hello from temp file!\n";
+    bool ok = getCheckInTemp("/dirname/test1.txt", &fd, false, O_WRONLY, true);
+    if (ok)
+    {
+        write(fd, tmp_txt.c_str(), tmp_txt.length());
+        cout << "OK - created and wrote new" << endl;
+        close(fd);
+    }
+
+    /* Tested */
+    cout << "D" << endl;
+    ok = getCheckInTemp("/dirname/test2.txt", &fd, true, O_RDONLY, false);
+    if (!ok)
+    {
+        cout << "OK - Couldn't find in temp" << endl;
+    }
+
+    cout << "E" << endl;
+    ok = getCheckInTemp("/dirname/test1.txt", &fd, true, O_RDONLY, false);
+    if (ok)
+    {
+        cout << "OK - Read from temp" << endl;
+    }
+
+    cout << "F" << endl;
+    string cmd = "touch " + getCachePath("/dir/newfile.txt");
+    system(cmd.c_str());
+    ok = getCheckInTemp("/dir/newfile.txt", &fd, true, O_RDONLY, true);
+    if (ok)
+    {
+        cout << "OK - Read from cache->temp" << endl;
+    }
+
+    /* Tested */
+    cout << "G" << endl;
+    commitToCache("/dirname/test1.txt", 1613373778);
+
     return 0;
 }
