@@ -36,6 +36,7 @@
 #include <grpcpp/grpcpp.h>
 
 #include "afs.grpc.pb.h"
+#include "cache_helper.h"
 
 using afs::DeleteReq;
 using afs::DeleteResp;
@@ -63,6 +64,8 @@ extern "C" {
 // gRPC client.
 struct AFSClient
 {
+  // Member functions.
+
   AFSClient(string cache_root)
     : stub_(FileServer::NewStub(
       grpc::CreateChannel("localhost:50051",
@@ -156,7 +159,7 @@ int rmdir(const char *fileName)
 
     // Check if a temp file exists for the file trying to be opened.
     int temp_fd = -1;
-    if (getCheckInTemp(path, temp_fd, false, O_RDONLY, false))
+    if (cache_helper->getCheckInTemp(path, &temp_fd, false, O_RDONLY, false))
     {
       // Another client has written dirty data to this file. Reject open() in
       // this case.
@@ -176,7 +179,7 @@ int rmdir(const char *fileName)
     ClientContext getattr_context;
     StatResponse getattr_reply;
 
-    string cachepath = getCachePath(path);
+    string cachepath = cache_helper->getCachePath(path);
     // If cache is valid, cache valid must be updated to a positive number.
     int cache_fd = -1;
     bool use_cache = false;
@@ -186,7 +189,8 @@ int rmdir(const char *fileName)
       stub_->GetAttr(&getattr_context, filepath, &getattr_reply);
     
     if (getattr_status.ok()) {
-			use_cache = !(isCacheOutOfDate(path, getattr_reply.mtime(), &cache_fd, false));
+			use_cache = !(cache_helper->isCacheOutOfDate(
+          path, getattr_reply.mtime(), &cache_fd, false, fi->flags));
 		}
     
     // Get file from server.
@@ -207,7 +211,8 @@ int rmdir(const char *fileName)
       string buf = std::string();
       if (is_create) {
           // New file created. Update/create the cached copy.
-          cache_fd = syncFileServerToCache(path, buf.c_str(), false, O_CREAT);
+          cache_fd = cache_helper->syncFileServerToCache(
+            path, buf.c_str(), false, O_CREAT);
           std::cout << "Open: created a new cache file with fd: " << cache_fd << "\n";
       } else if (reply.file_exists()) {
           cout << "Open: file found on the server";
@@ -223,35 +228,26 @@ int rmdir(const char *fileName)
               return -EIO;
           }
           cout << " ======" <<  buf;
+          cache_fd = cache_helper->syncFileServerToCache(
+            path, buf.c_str(), false, fi->flags);
 
           std::cout << "Open: finish download from server \n";
       } else {
           // Opened(not create) a file not present on server.
-          getCheckInTemp(path, temp_fd, false, O_CREAT, true) ;
+          cache_helper->getCheckInTemp(path, &temp_fd, false, O_CREAT, true) ;
           std::cout << "Open: created a new temp file with fd " << temp_fd << "\n";
       }
     }
 
-    // give user the file
-    // fi->fh = open(cachepath(path).c_str(), fi->flags);
-    // cout << "==== before OPEN LOCAL TO cachepath: " << cachepath;
-    // int ret = open(cachepath.c_str(), fi->flags);
-    // if (ret < 0) {
-    //     std::cout << "[err] Open: error open downloaded cache file.\n";
-    //     return -errno;
-    // }
-
     if (temp_fd > -1) {
       fi->fh = temp_fd;
       return temp_fd;
-      cout << "==== == AFTER OPEN fd RETURNING===== " << fi->fh;
-    } else if {
+    } else if (cache_fd > -1) {
       fi->fh = cache_fd;
       return cache_fd;
     }
       std::cout << "[err] Open: error open downloaded cache file.\n";
       return -1;
-    cout << "==== == AFTER OPEN fd RETURNING===== " << fi->fh;
   }
 
   int Close(const char* file_path) {
@@ -347,12 +343,17 @@ int rmdir(const char *fileName)
 
   unique_ptr<FileServer::Stub> stub_;
   string cache_root;
+  CacheHelper* cache_helper;
 };
 
 // Port calls to C-code.
 
 AFSClient* NewAFSClient(char* cache_root) {
   AFSClient* client = new AFSClient(cache_root);
+
+  // Initialize the cache helper.
+  client -> cache_helper = NewCacheHelper();
+  client -> cache_helper -> initCache();
 
   return client;
 }
