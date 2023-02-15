@@ -36,6 +36,7 @@
 #include <grpcpp/grpcpp.h>
 
 #include "afs.grpc.pb.h"
+#include "cache_helper.h"
 
 using afs::DeleteReq;
 using afs::DeleteResp;
@@ -63,6 +64,8 @@ extern "C" {
 // gRPC client.
 struct AFSClient
 {
+  // Member functions.
+
   AFSClient(string cache_root)
     : stub_(FileServer::NewStub(
       grpc::CreateChannel("localhost:50051",
@@ -347,12 +350,17 @@ int rmdir(const char *fileName)
 
   unique_ptr<FileServer::Stub> stub_;
   string cache_root;
+  CacheHelper* cache_helper;
 };
 
 // Port calls to C-code.
 
 AFSClient* NewAFSClient(char* cache_root) {
   AFSClient* client = new AFSClient(cache_root);
+
+  // Initialize the cache helper.
+  client -> cache_helper = NewCacheHelper();
+  client -> cache_helper -> initCache();
 
   return client;
 }

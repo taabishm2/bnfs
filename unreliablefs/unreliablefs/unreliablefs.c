@@ -175,9 +175,9 @@ int main(int argc, char *argv[])
     }
 
     afsClient = NewAFSClient("/");
-    cacheHelper = NewCacheHelper();
+    // cacheHelper = NewCacheHelper();
     
-    Cache_initCache(cacheHelper);
+    // Cache_initCache(cacheHelper);
     fprintf(stdout, "Complete init cache and temp\n");
 
     fprintf(stdout, "starting FUSE filesystem unreliablefs\n");
