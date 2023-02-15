@@ -55,8 +55,6 @@ class FileServerServiceImpl final : public FileServer::Service
     Status GetAttr(ServerContext *context, const SimplePathRequest *request,
                    StatResponse *reply) override
     {
-        cout << "Recieved GetAttr RPC " << request->path().c_str() << " from client!" << endl;
-
         struct stat stbuf;
         int res = lstat(getServerPath(request->path()), &stbuf);
 
@@ -81,8 +79,6 @@ class FileServerServiceImpl final : public FileServer::Service
         reply->set_ctime(stbuf.st_ctime);
 
         reply->mutable_baseresponse()->CopyFrom(baseResponse);
-        cout << "*** FINISHED getATTR with " << getServerPath(request->path()) << ":" << reply->baseresponse().errorcode() << endl;
-        cout << "*** FINISHED getATTR with errno " << errno << endl;
         return Status::OK;
     }
 
@@ -120,8 +116,7 @@ class FileServerServiceImpl final : public FileServer::Service
 
         if (res == -1)
             reply->set_errorcode(-errno);
-
-        cout << "SERVER: Response errno " << -errno << endl;
+            
         return Status::OK;
     }
 

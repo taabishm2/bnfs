@@ -77,8 +77,6 @@ struct AFSClient
 		StatResponse reply;
 		ClientContext context;
 
-		cout << "Client getAttr called" << endl;
-
 		Status status = stub_->GetAttr(&context, request, &reply);
 
 		if (status.ok())
@@ -96,9 +94,7 @@ struct AFSClient
 			stbuf->st_ctime = reply.ctime();
 		}
 
-    cout << "** CLIENT GOT FOR getATTR: " << reply.baseresponse().errorcode() << endl;
 		int res = reply.baseresponse().errorcode();
-    cout << "** FINAL CLIENT GOT FOR getATTR: " << res << endl;
     return res;
 	}
 
@@ -131,9 +127,6 @@ struct AFSClient
 
 		Status status = stub_->Mkdir(&context, request, &reply);
     int res = reply.errorcode();
-    
-    cout << "CLIENT: mkdir GOT: " << reply.errorcode() << endl;
-    cout << "CLIENT: FINAL mkdir GOT: " << res << endl;
     
     if (res < 0) { return res; }
     return 0;
