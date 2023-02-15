@@ -255,6 +255,7 @@ int rmdir(const char *fileName)
     }
   }
 
+  // TODO: CALL FROM CACHE HELPER
   std::string cachepath(const char* rel_path) {
         return cache_root + hashpath(rel_path);
     }
