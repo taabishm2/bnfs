@@ -645,12 +645,7 @@ int unreliable_access(const char *path, int mode)
         return ret;
     }
 
-    ret = access(path, mode); 
-    if (ret == -1) {
-        return -errno;
-    }
-    
-    return 0;
+	return AFS_access(afsClient, path, mode);
 }
 
 int unreliable_create(const char *path, mode_t mode,
