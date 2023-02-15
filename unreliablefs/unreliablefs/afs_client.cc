@@ -48,11 +48,15 @@ using afs::ReadDirResponse;
 using afs::BaseResponse;
 using afs::SimplePathRequest;
 using afs::StatResponse;
+
 using grpc::Channel;
 using grpc::ClientContext;
 using grpc::Status;
+using grpc::ClientWriter;
 
 using namespace std;
+
+#define BUFSIZE 65500
 
 extern "C" {
 
@@ -257,40 +261,59 @@ int rmdir(const char *fileName)
     return ret;
   }
 
-  int Close(const char* file_path)
-  {
-    // Read file from local cache, if present.
-    int fd = open(file_path, O_RDONLY);
-      if (fd == -1)
-        return -errno;
+  int Close(const char* file_path) {
 
-    int size = 1000; // TODO: read and put file in chunks using streaming.
-    char* buf = (char*) malloc(sizeof(char) * (size + 1));
-    int res = pread(fd, buf, size, 0);
-    if (res == -1)
-      return -errno;
+    // Read file from cache and make gRPC put file writes.
+    // string cache_path = cache_helper.getCachedPath(file_path);
+    ifstream file(file_path, ios::in);
+    if(!file) {
+      cout << "File not found at path " << file_path << endl;
+
+      return -1;
+    }
+    cout << "Putting file contents from path: " << file_path << "\n";
 
     // Prepare grpc messages.
+    ClientContext context;
     PutFileReq request;
     PutFileResp reply;
-    ClientContext context;
 
-    request.set_path(file_path);
-    request.set_contents(buf);
+    std::unique_ptr<ClientWriter<PutFileReq>> writer(stub_->PutFile(&context, &reply));
+    string buf(BUFSIZE, '\0');
+    while (!file.eof()) {
+      // Read file contents into buf.
+      file.read(&buf[0], BUFSIZE);
 
-    Status status = stub_->PutFile(&context, request, &reply);
+      request.set_path(file_path);
+      request.set_contents(buf);
 
-    if (status.ok())
-    {
-      cout << "[log] AFS file contents sent " << request.contents() << endl;
-      return 0;
+      if (!writer->Write(request)) {
+          // Revert cache changes.
+          // cache_helper.uncommit(file_path);
+
+          // Broken stream.
+          break;
+      }
     }
-    else
-    {
-      cout << status.error_code() << ": " << status.error_message()
-         << endl;
-      return -errno;
+    writer->WritesDone();
+    Status status = writer->Finish();
+    
+    if (!status.ok()) {
+      cout << "PutFile rpc failed: " << status.error_message() << std::endl;
+
+      // Revert cache changes.
+      // cache_helper.uncommit(file_path);
+
+      return -1;
     }
+    else {
+      cout << "Finished sending file with path " << file_path << endl;
+
+      // commit cache changes.
+      // cache_helper.commit(file_path);
+    }
+
+    return 0;
   }
 
   // TODO: CALL FROM CACHE HELPER
@@ -298,36 +321,36 @@ int rmdir(const char *fileName)
         return cache_root + hashpath(rel_path);
     }
 
-    std::string cachepath(std::string cache_root, const char* rel_path) {
-        // local cached filename is SHA-256 hash of the path
-        // referencing https://stackoverflow.com/questions/2262386/generate-sha256-with-openssl-and-c
-        unsigned char hash[SHA256_DIGEST_LENGTH];
-        SHA256_CTX sha256;
-        SHA256_Init(&sha256);
-        SHA256_Update(&sha256, rel_path, strlen(rel_path));
-        SHA256_Final(hash, &sha256);
-        std::stringstream ss;
-        for (int i = 0; i < SHA256_DIGEST_LENGTH; ++i) {
-            ss << std::hex << std::setw(2) << std::setfill('0') << ((int)hash[i]);
-        }
-        std::cout << "hashed hex string is " << ss.str() << std::endl; // debug
-        return cache_root + ss.str();
-    }
+  std::string cachepath(std::string cache_root, const char* rel_path) {
+      // local cached filename is SHA-256 hash of the path
+      // referencing https://stackoverflow.com/questions/2262386/generate-sha256-with-openssl-and-c
+      unsigned char hash[SHA256_DIGEST_LENGTH];
+      SHA256_CTX sha256;
+      SHA256_Init(&sha256);
+      SHA256_Update(&sha256, rel_path, strlen(rel_path));
+      SHA256_Final(hash, &sha256);
+      std::stringstream ss;
+      for (int i = 0; i < SHA256_DIGEST_LENGTH; ++i) {
+          ss << std::hex << std::setw(2) << std::setfill('0') << ((int)hash[i]);
+      }
+      std::cout << "hashed hex string is " << ss.str() << std::endl; // debug
+      return cache_root + ss.str();
+  }
 
-    std::string hashpath(const char* rel_path) {
-        // local cached filename is SHA-256 hash of the path
-        // referencing https://stackoverflow.com/questions/2262386/generate-sha256-with-openssl-and-c
-        unsigned char hash[SHA256_DIGEST_LENGTH];
-        SHA256_CTX sha256;
-        SHA256_Init(&sha256);
-        SHA256_Update(&sha256, rel_path, strlen(rel_path));
-        SHA256_Final(hash, &sha256);
-        std::stringstream ss;
-        for (int i = 0; i < SHA256_DIGEST_LENGTH; ++i) {
-            ss << std::hex << std::setw(2) << std::setfill('0') << ((int)hash[i]);
-        }
-        return ss.str();
-    }
+  std::string hashpath(const char* rel_path) {
+      // local cached filename is SHA-256 hash of the path
+      // referencing https://stackoverflow.com/questions/2262386/generate-sha256-with-openssl-and-c
+      unsigned char hash[SHA256_DIGEST_LENGTH];
+      SHA256_CTX sha256;
+      SHA256_Init(&sha256);
+      SHA256_Update(&sha256, rel_path, strlen(rel_path));
+      SHA256_Final(hash, &sha256);
+      std::stringstream ss;
+      for (int i = 0; i < SHA256_DIGEST_LENGTH; ++i) {
+          ss << std::hex << std::setw(2) << std::setfill('0') << ((int)hash[i]);
+      }
+      return ss.str();
+  }
 
   unique_ptr<FileServer::Stub> stub_;
   string cache_root;

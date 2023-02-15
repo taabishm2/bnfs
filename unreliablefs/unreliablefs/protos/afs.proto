@@ -16,8 +16,11 @@ service FileServer {
   rpc Rmdir(SimplePathRequest) returns (BaseResponse) {}
 
   // File operations
+
   rpc Open(OpenReq) returns (stream OpenResp) {}
-  rpc PutFile(PutFileReq) returns (PutFileResp) {} 
+
+  rpc PutFile(stream PutFileReq) returns (PutFileResp) {} 
+
   rpc Delete(DeleteReq) returns (DeleteResp) {}
 }
 
