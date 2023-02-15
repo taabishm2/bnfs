@@ -14,6 +14,7 @@ typedef struct AFSClient AFSClient;
 typedef struct CacheHelper CacheHelper;
 
 AFSClient* NewAFSClient();
+CacheHelper* NewCacheHelper();
 
 int AFS_getAttr(AFSClient* client, const char* file_path, struct stat *buf);
 
@@ -28,6 +29,20 @@ int AFS_open(AFSClient* client, const char* file_path, struct fuse_file_info *fi
 int AFS_close(AFSClient* v, const char* file_path);
 
 void Cache_initCache(CacheHelper* helper);
+
+bool Cache_getCheckInCache(CacheHelper *helper, const char *path, int *file_descriptor, bool close_file, int open_mode);
+
+bool Cache_getCheckInTemp(CacheHelper *helper, const char *path, int *file_descriptor, bool close_file, int open_mode, bool create_new);
+
+bool Cache_isCacheOutOfDate(CacheHelper *helper, const char *path, int server_modified_at_epoch, int *file_descriptor, bool close_file, int open_mode);
+
+int Cache_syncFileServerToCache(CacheHelper *helper, const char *path, const char* data, bool close_file, int open_mode);
+
+int Cache_commitToCache(CacheHelper *helper, const char *path, int server_modified_at_epoch);
+
+bool Cache_canOpenFile(CacheHelper *helper, const char *path);
+
+void Cache_markFileDirty(CacheHelper *helper, const char *path);
 
 #ifdef __cplusplus
 }

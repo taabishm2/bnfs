@@ -174,8 +174,11 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    // Initialize afs client.
     afsClient = NewAFSClient("/");
+    cacheHelper = NewCacheHelper();
+    
+    Cache_initCache(cacheHelper);
+    fprintf(stdout, "Complete init cache and temp\n");
 
     fprintf(stdout, "starting FUSE filesystem unreliablefs\n");
     int ret = fuse_main(args.argc, args.argv, &unreliable_ops, NULL);

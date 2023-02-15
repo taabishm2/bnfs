@@ -29,6 +29,8 @@ extern "C"
 
     struct CacheHelper
     {
+        CacheHelper(void) {}
+
         string getCachePath(void)
         {
             return CLIENT_DIR_ROOT + "/cache";
@@ -176,7 +178,7 @@ extern "C"
         }
 
         /* Returns file descriptor of cache file */
-        int syncFileServerToCache(const char *path, const string data, bool close_file, int open_mode)
+        int syncFileServerToCache(const char *path, const char *data, bool close_file, int open_mode)
         {
             string cache_path = getCachePath(path);
             ofstream file(cache_path, std::ios::binary);
@@ -186,7 +188,7 @@ extern "C"
                 return -1;
             }
 
-            file.write(data.data(), data.size());
+            file.write(data, strlen(data));
             file.close();
 
             int file_descriptor = -1;
@@ -318,43 +320,49 @@ extern "C"
         }
     };
 
+    CacheHelper *NewCacheHelper()
+    {
+        CacheHelper *helper = new CacheHelper();
+        return helper;
+    }
+
     void Cache_initCache(CacheHelper *helper)
     {
         return helper->initCache();
     }
 
-    bool getCheckInCache(CacheHelper *helper, const char *path, int *file_descriptor, bool close_file, int open_mode)
+    bool Cache_getCheckInCache(CacheHelper *helper, const char *path, int *file_descriptor, bool close_file, int open_mode)
     {
         return helper->getCheckInCache(path, file_descriptor, close_file, open_mode);
     }
 
-    bool getCheckInTemp(CacheHelper *helper, const char *path, int *file_descriptor, bool close_file, int open_mode, bool create_new)
+    bool Cache_getCheckInTemp(CacheHelper *helper, const char *path, int *file_descriptor, bool close_file, int open_mode, bool create_new)
     {
         return helper->getCheckInTemp(path, file_descriptor, close_file, open_mode, create_new);
     }
 
-    bool isCacheOutOfDate(CacheHelper *helper, const char *path, int server_modified_at_epoch, int *file_descriptor, bool close_file, int open_mode)
+    bool Cache_isCacheOutOfDate(CacheHelper *helper, const char *path, int server_modified_at_epoch, int *file_descriptor, bool close_file, int open_mode)
     {
         return helper->isCacheOutOfDate(path, server_modified_at_epoch, file_descriptor, close_file, open_mode);
     }
 
-    int syncFileServerToCache(CacheHelper *helper, const char *path, const string data, bool close_file, int open_mode)
+    int Cache_syncFileServerToCache(CacheHelper *helper, const char *path, const char *data, bool close_file, int open_mode)
     {
         return helper->syncFileServerToCache(path, data, close_file, open_mode);
     }
 
-    int commitToCache(CacheHelper *helper, const char *path, int server_modified_at_epoch)
+    int Cache_commitToCache(CacheHelper *helper, const char *path, int server_modified_at_epoch)
     {
         return helper->commitToCache(path, server_modified_at_epoch);
     }
 
-    bool canOpenFile(CacheHelper *helper, const char *path)
+    bool Cache_canOpenFile(CacheHelper *helper, const char *path)
     {
         return helper->canOpenFile(path);
     }
 
-    void markFileDirty(CacheHelper *helper, const char *path)
+    void Cache_markFileDirty(CacheHelper *helper, const char *path)
     {
-        return helper.markFileDirt(path);
+        helper->markFileDirty(path);
     }
 }
