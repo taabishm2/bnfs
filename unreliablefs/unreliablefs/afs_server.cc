@@ -49,7 +49,7 @@ class FileServerServiceImpl final : public FileServer::Service
   Status GetAttr(ServerContext *context, const SimplePathRequest *request,
                    StatResponse *reply) override
   {
-      cout << "[log] recieved GetAttr RPC from client!" << endl;
+      cout << "[log] recieved GetAttr RPC from client! for " << request -> path() << endl;
 
       struct stat stbuf;
       int res = lstat(request -> path().c_str(), &stbuf);
@@ -113,17 +113,19 @@ class FileServerServiceImpl final : public FileServer::Service
 
         while (!file.eof()) {
           file.read(&buf[0], BUFSIZE);
+          cout << "[server log] sending contents " << buf << endl;
           reply.set_buf(buf);
           writer->Write(reply);
         }
 
-        file.read(&buf[0], BUFSIZE);
-            buf.resize(file.gcount());
-            reply.set_buf(buf);
-            writer->Write(reply);
+        // Do we need this?
+        // file.read(&buf[0], BUFSIZE);
+        // buf.resize(file.gcount());
+        // reply.set_buf(buf);
+        // writer->Write(reply);
 
         file.close();
-        // reply.set_err(read_res);
+
         return Status::OK;
     }
 

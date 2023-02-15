@@ -66,14 +66,13 @@ struct AFSClient
       grpc::CreateChannel("localhost:50051",
       grpc::InsecureChannelCredentials()))), cache_root(cache_root) {}
 
-  int Open(const char* path, struct fuse_file_info *fi)
-  {
+  int Open(const char* path, int flags) {
     std::cout << "[log] open: start\n";
-    // std::string path_str(path);
-    std::string path_str = "/tmp/test.txt";
+    std::string path_str(path);
+    // std::string path_str = path;
     OpenReq request;
     request.set_path(path_str);
-    request.set_flag(fi->fh);
+    request.set_flag(flags);
 
     // for getattr()
     SimplePathRequest filepath;
@@ -85,66 +84,58 @@ struct AFSClient
     // TODO(Sweksha) : Use cache based on GetAttr() result.
     stub_->GetAttr(&get_attr_context, filepath, &getattr_reply);
     
-    // Get file from server.
+    // Flow: Get file from server.
     std::cout << "Open: Opening file from server." << std::endl;
     
-    OpenResp reply;
+    // std::unique_ptr<grpc::ClientReader<OpenResp> > reader(
+    //     stub_->Open(&context, request));
+    // OpenResp reply;
 
+    // // Read the stream from server. 
+    // if (!reader->Read(&reply)) {
+    //     std::cout << "[err] Open: failed to download file: " << path_str
+    //               << " from server." << std::endl;
+    //     return -EIO;
+    // }
 
-    std::unique_ptr<grpc::ClientReader<OpenResp> > reader(
-        stub_->Open(&context, request));
+    string cachepath = getCachePath(path);
+    cout << "==== Caching file " << path_str << " at " << cachepath << endl;
+    // if (reply.file_exists()) {
+    //     // open file with O_TRUNC
+    //     // std::ofstream ofile(cachepath(path_str.c_str()),
+    //     //     std::ios::binary | std::ios::out | std::ios::trunc);
+    //     std::ofstream ofile(cachepath.c_str(),
+    //         std::ios::binary | std::ios::out | std::ios::trunc);
 
-    // Read the stream from server. 
-    if (!reader->Read(&reply)) {
-        std::cout << "[err] Open: failed to download file: " << path_str
-                  << " from server." << std::endl;
-        return -EIO;
-    }
+    //     // TODO: check failure
+    //     ofile << reply.buf();
+    //     while (reader->Read(&reply)) {
+    //         ofile << reply.buf();
+    //     }
 
-    string cachepath = "/tmp/cache.txt";
-    // cout << "====Caching file " << path_str << " at " << cachepath(path_str.c_str());
-    cout << "====Caching file " << path_str << " at " << cachepath;
-    if (reply.file_exists()) {
-        // open file with O_TRUNC
-        // std::ofstream ofile(cachepath(path_str.c_str()),
-        //     std::ios::binary | std::ios::out | std::ios::trunc);
-        std::ofstream ofile(cachepath.c_str(),
-            std::ios::binary | std::ios::out | std::ios::trunc);
+    //     Status status = reader->Finish();
+    //     if (!status.ok()) {
+    //         std::cout << "[err] Open: failed to download from server." << std::endl;
+    //         return -EIO;
+    //     }
+    //     ofile.close(); // the cache is persisted
 
-        // TODO: check failure
-        ofile << reply.buf();
-        while (reader->Read(&reply)) {
-            cout << "contents " << reply.buf() << endl;
-            ofile << reply.buf();
-        }
+    //     std::cout << "Open: finish download from server\n";
+    // }
+    // else {
+    //     std::cout << "Open: created a new file\n";
+    //     close(creat(cachepath.c_str(), 00777));
+    // }
 
-        Status status = reader->Finish();
-        if (!status.ok()) {
-            std::cout << "[err] Open: failed to download from server." << std::endl;
-            return -EIO;
-        }
-        ofile.close(); // the cache is persisted
-
-        std::cout << "Open: finish download from server\n";
-    }
-    else {
-        std::cout << "Open: created a new file\n";
-        close(creat(cachepath.c_str(), 00777));
-    }
-
-    // give user the file
-    // fi->fh = open(cachepath(path_str.c_str()).c_str(), fi->flags);
-    // cout << "path" << cachepath(path_str.c_str()).c_str() << " fh " << fi -> fh << endl;
-    fi->fh = open(cachepath.c_str(), fi->flags);
-    cout << "path" << cachepath.c_str() << " fh " << fi -> fh << endl;
-    if (fi->fh < 0) {
-        std::cout << "[err] Open: error open downloaded cache file.\n";
+    // give user the file.
+    int ret = open(cachepath.c_str(), flags);
+    if (ret == -1) {
+        cout << "[err] Open: error open downloaded cache file.\n";
         return -errno;
     }
+    cout << "path" << cachepath.c_str() << " fh " << ret << endl;
 
-    cout << "added user file handle" << endl;
-
-    return 0;
+    return ret;
   }
 
   int GetAttr(const char* fileName, struct stat *stbuf)
@@ -230,40 +221,40 @@ struct AFSClient
     return 0;
   }
 
-  std::string cachepath(const char* rel_path) {
-        return cache_root + hashpath(rel_path);
-    }
+  std::string getCachePath(const char* rel_path) {
+      return cache_root + hashpath(rel_path);
+  }
 
-    std::string cachepath(std::string cache_root, const char* rel_path) {
-        // local cached filename is SHA-256 hash of the path
-        // referencing https://stackoverflow.com/questions/2262386/generate-sha256-with-openssl-and-c
-        unsigned char hash[SHA256_DIGEST_LENGTH];
-        SHA256_CTX sha256;
-        SHA256_Init(&sha256);
-        SHA256_Update(&sha256, rel_path, strlen(rel_path));
-        SHA256_Final(hash, &sha256);
-        std::stringstream ss;
-        for (int i = 0; i < SHA256_DIGEST_LENGTH; ++i) {
-            ss << std::hex << std::setw(2) << std::setfill('0') << ((int)hash[i]);
-        }
-        std::cout << "hashed hex string is " << ss.str() << std::endl; // debug
-        return cache_root + ss.str();
+  std::string getCachePath(std::string cache_root, const char* rel_path) {
+    // local cached filename is SHA-256 hash of the path
+    // referencing https://stackoverflow.com/questions/2262386/generate-sha256-with-openssl-and-c
+    unsigned char hash[SHA256_DIGEST_LENGTH];
+    SHA256_CTX sha256;
+    SHA256_Init(&sha256);
+    SHA256_Update(&sha256, rel_path, strlen(rel_path));
+    SHA256_Final(hash, &sha256);
+    std::stringstream ss;
+    for (int i = 0; i < SHA256_DIGEST_LENGTH; ++i) {
+        ss << std::hex << std::setw(2) << std::setfill('0') << ((int)hash[i]);
     }
+    std::cout << "hashed hex string is " << ss.str() << std::endl; // debug
+    return cache_root + ss.str();
+}
 
-    std::string hashpath(const char* rel_path) {
-        // local cached filename is SHA-256 hash of the path
-        // referencing https://stackoverflow.com/questions/2262386/generate-sha256-with-openssl-and-c
-        unsigned char hash[SHA256_DIGEST_LENGTH];
-        SHA256_CTX sha256;
-        SHA256_Init(&sha256);
-        SHA256_Update(&sha256, rel_path, strlen(rel_path));
-        SHA256_Final(hash, &sha256);
-        std::stringstream ss;
-        for (int i = 0; i < SHA256_DIGEST_LENGTH; ++i) {
-            ss << std::hex << std::setw(2) << std::setfill('0') << ((int)hash[i]);
-        }
-        return ss.str();
+  std::string hashpath(const char* rel_path) {
+    // local cached filename is SHA-256 hash of the path
+    // referencing https://stackoverflow.com/questions/2262386/generate-sha256-with-openssl-and-c
+    unsigned char hash[SHA256_DIGEST_LENGTH];
+    SHA256_CTX sha256;
+    SHA256_Init(&sha256);
+    SHA256_Update(&sha256, rel_path, strlen(rel_path));
+    SHA256_Final(hash, &sha256);
+    std::stringstream ss;
+    for (int i = 0; i < SHA256_DIGEST_LENGTH; ++i) {
+        ss << std::hex << std::setw(2) << std::setfill('0') << ((int)hash[i]);
     }
+    return ss.str();
+}
 
   unique_ptr<FileServer::Stub> stub_;
   string cache_root;
@@ -277,8 +268,8 @@ AFSClient* NewAFSClient(char* cache_root) {
   return client;
 }
 
-int AFS_open(AFSClient* client, const char* file_path, struct fuse_file_info *fi) {
-  return client -> Open(file_path, fi);
+int AFS_open(AFSClient* client, const char* file_path, int flags) {
+  return client -> Open(file_path, flags);
 }
 
 int AFS_getAttr(AFSClient* client, 
@@ -288,6 +279,11 @@ int AFS_getAttr(AFSClient* client,
 
 int AFS_close(AFSClient* client, const char* file_path) {
   return client -> Close(file_path);
+}
+
+const char* AFS_getCachePath(AFSClient* client, const char* file_path) {
+  string res = client -> getCachePath(file_path) ;
+  return res.c_str();
 }
 
 }

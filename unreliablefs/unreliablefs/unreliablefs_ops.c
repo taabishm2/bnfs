@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include <sys/ioctl.h>
 #include <sys/file.h>
@@ -316,13 +317,16 @@ int unreliable_open(const char *path, struct fuse_file_info *fi)
     }
 
     // Open call to server.
-	// return AFS_open(afsClient, path, fi);
-
-    ret = open(path, fi->flags);
+	ret = AFS_open(afsClient, path, fi -> flags);
+    // ret = open(path, fi->flags);
     if (ret == -1) {
         return -errno;
     }
     fi->fh = ret;
+
+    char* buf = malloc(sizeof(char) * 100);
+    pread(fi-> fh, buf, 100, 0);
+    printf("Contents in Buffer after open!====== %s", buf);
 
     return 0;
 }
@@ -442,7 +446,7 @@ int unreliable_release(const char *path, struct fuse_file_info *fi)
     }
     
     // Flush changes from local file to afs.
-	// AFS_close(afsClient, path);
+	AFS_close(afsClient, path);
 
     // Actually close the file descriptor.
     ret = close(fi->fh);

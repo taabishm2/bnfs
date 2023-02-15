@@ -13,9 +13,12 @@ typedef struct AFSClient AFSClient;
 
 AFSClient* NewAFSClient();
 
-int AFS_open(AFSClient* client, const char* file_path, struct fuse_file_info *fi);
+// On success, returns handle to a locally cached file.
+int AFS_open(AFSClient* client, const char* file_path, int flags);
 
 int AFS_getAttr(AFSClient* client, const char* file_path, struct stat *buf);
+
+const char* AFS_getCachePath(AFSClient* v, const char* file_path);
 
 int AFS_close(AFSClient* v, const char* file_path);
 

@@ -175,7 +175,7 @@ int main(int argc, char *argv[])
     }
 
     // Initialize afs client.
-    afsClient = NewAFSClient("/");
+    afsClient = NewAFSClient("/tmp/");
 
     fprintf(stdout, "starting FUSE filesystem unreliablefs\n");
     int ret = fuse_main(args.argc, args.argv, &unreliable_ops, NULL);
