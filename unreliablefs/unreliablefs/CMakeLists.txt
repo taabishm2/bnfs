@@ -6,7 +6,8 @@ set(UNRELIABLEFS_SRC conf.c
                      unreliablefs.c
                      unreliablefs_errinj.c
                      unreliablefs_ops.c
-                     afs_client.cc)
+                     afs_client.cc
+                     cache_helper.cc)
 
 find_package(FUSE 2.9 REQUIRED)
 

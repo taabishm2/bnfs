@@ -11,6 +11,7 @@ extern "C" {
 #endif
 
 typedef struct AFSClient AFSClient;
+typedef struct CacheHelper CacheHelper;
 
 AFSClient* NewAFSClient();
 
@@ -26,12 +27,14 @@ int AFS_open(AFSClient* client, const char* file_path, struct fuse_file_info *fi
 
 int AFS_close(AFSClient* v, const char* file_path);
 
+void Cache_initCache(CacheHelper* helper);
 
 #ifdef __cplusplus
 }
 #endif
 
 extern struct AFSClient* afsClient;
+extern struct CacheHelper* cacheHelper;
 
 int unreliable_getattr(const char *, struct stat *);
 int unreliable_readlink(const char *, char *, size_t);

@@ -18,8 +18,6 @@
 
 #define ERRNO_NOOP -999
 
-// #define AFS_CLIENT ()
-
 #include "unreliablefs_ops.h"
 
 const char *fuse_op_name[] = {
@@ -73,6 +71,7 @@ const char *fuse_op_name[] = {
 };
 
 struct AFSClient* afsClient;
+struct CacheHelper* cacheHelper;
 
 extern int error_inject(const char* path, fuse_op operation);
 
