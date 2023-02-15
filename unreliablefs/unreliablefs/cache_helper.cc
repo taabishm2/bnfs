@@ -322,4 +322,39 @@ extern "C"
     {
         return helper->initCache();
     }
+
+    bool getCheckInCache(CacheHelper *helper, const char *path, int *file_descriptor, bool close_file, int open_mode)
+    {
+        return helper->getCheckInCache(path, file_descriptor, close_file, open_mode);
+    }
+
+    bool getCheckInTemp(CacheHelper *helper, const char *path, int *file_descriptor, bool close_file, int open_mode, bool create_new)
+    {
+        return helper->getCheckInTemp(path, file_descriptor, close_file, open_mode, create_new);
+    }
+
+    bool isCacheOutOfDate(CacheHelper *helper, const char *path, int server_modified_at_epoch, int *file_descriptor, bool close_file, int open_mode)
+    {
+        return helper->isCacheOutOfDate(path, server_modified_at_epoch, file_descriptor, close_file, open_mode);
+    }
+
+    int syncFileServerToCache(CacheHelper *helper, const char *path, const string data, bool close_file, int open_mode)
+    {
+        return helper->syncFileServerToCache(path, data, close_file, open_mode);
+    }
+
+    int commitToCache(CacheHelper *helper, const char *path, int server_modified_at_epoch)
+    {
+        return helper->commitToCache(path, server_modified_at_epoch);
+    }
+
+    bool canOpenFile(CacheHelper *helper, const char *path)
+    {
+        return helper->canOpenFile(path);
+    }
+
+    void markFileDirty(CacheHelper *helper, const char *path)
+    {
+        return helper.markFileDirt(path);
+    }
 }
