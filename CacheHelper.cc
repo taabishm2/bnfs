@@ -15,7 +15,8 @@
 #include <cstdlib>
 #include <unordered_set>
 #include <chrono>
-#include <sys/time.h>
+#include <sys/types.h>
+#include <utime.h>
 
 using namespace ::std;
 
@@ -190,18 +191,15 @@ int syncFileServerToCache(const char *path, const string data, bool close_file, 
     return file_descriptor;
 }
 
-bool setFileModifiedTime(const char *path, int epochTime)
+bool setFileModifiedTime(const char *path, int epoch_time)
 {
-    struct timeval times[2];
-    times[1].tv_sec = epochTime;
-    times[1].tv_usec = 0;
+    struct utimbuf new_times;
+    new_times.actime = epoch_time;
+    new_times.modtime = epoch_time;
 
-    if (utimes(path, times) == -1) {
-     cout << "It failed " << errno << endl;
+    if (utime(path, &new_times) == -1)
         return false;
-    }
 
-    cout << "It works" << endl;
     return true;
 }
 
@@ -228,13 +226,10 @@ int commitToCache(const char *path, int server_modified_at_epoch)
             return 1;
     }
 
-    cout << "Changing time of " << temp_path << endl;
     setFileModifiedTime(temp_path.c_str(), server_modified_at_epoch);
-    cout << "Changing time of " << cache_path << endl;
     setFileModifiedTime(cache_path.c_str(), server_modified_at_epoch);
 
     dirty_files.erase(getHashedPath(path));
-    cout << "dirty_files" << endl;
 
     return 0;
 }
@@ -311,7 +306,7 @@ int main()
 
     /* Tested */
     cout << "G" << endl;
-    commitToCache("/dirname/test1.txt", 1613373778);
+    commitToCache("/dirname/test1.txt", 1581788940);
 
     return 0;
 }
