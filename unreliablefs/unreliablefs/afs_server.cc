@@ -27,6 +27,7 @@ using afs::OpenResp;
 using afs::PutFileReq;
 using afs::PutFileResp;
 using afs::ReadDirResponse;
+using afs::AccessPathRequest;
 using afs::SimplePathRequest;
 using afs::StatResponse;
 
@@ -55,6 +56,7 @@ class FileServerServiceImpl final : public FileServer::Service
     Status GetAttr(ServerContext *context, const SimplePathRequest *request,
                    StatResponse *reply) override
     {
+        cout << "SERVER: GetAttr " << request->path().c_str() << endl;
         struct stat stbuf;
         int res = lstat(getServerPath(request->path()), &stbuf);
 
@@ -85,6 +87,7 @@ class FileServerServiceImpl final : public FileServer::Service
     Status ReadDir(ServerContext *context, const SimplePathRequest *request,
                    ReadDirResponse *reply)
     {
+        cout << "SERVER: ReadDir " << request->path().c_str() << endl;
         DIR *dp;
         struct dirent *de;
 
@@ -111,8 +114,20 @@ class FileServerServiceImpl final : public FileServer::Service
                  BaseResponse *reply)
     {
         cout << "SERVER: Mkdir " << request->path().c_str() << endl;
-
         int res = mkdir(getServerPath(request->path()), 777);
+
+        if (res == -1)
+            reply->set_errorcode(-errno);
+            
+        return Status::OK;
+    }
+
+    Status Access(ServerContext *context, const AccessPathRequest*request,
+                 BaseResponse *reply)
+    {
+        cout << "SERVER: Access " << request->path().c_str() << endl;
+
+        int res = access(getServerPath(request->path()), request->mode());
 
         if (res == -1)
             reply->set_errorcode(-errno);
@@ -123,6 +138,7 @@ class FileServerServiceImpl final : public FileServer::Service
     Status Rmdir(ServerContext *context, const SimplePathRequest *request,
                  BaseResponse *reply)
     {
+        cout << "SERVER: Rmdir " << request->path().c_str() << endl;
         int res = rmdir(getServerPath(request->path()));
 
         if (res == -1)
@@ -134,7 +150,7 @@ class FileServerServiceImpl final : public FileServer::Service
     Status Open(ServerContext *context, const OpenReq *request,
                 ServerWriter<OpenResp> *writer) override
     {
-        cout << "Recieved Open RPC from client!" << endl;
+        cout << "SERVER: Open " << request->path().c_str() << endl;
         OpenResp reply;
         string path = getServerPath(request->path());
         ifstream file(path, ios::in);

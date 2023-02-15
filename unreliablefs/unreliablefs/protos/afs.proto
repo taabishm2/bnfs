@@ -15,6 +15,8 @@ service FileServer {
 
   rpc Rmdir(SimplePathRequest) returns (BaseResponse) {}
 
+  rpc Access(AccessPathRequest) returns (BaseResponse) {}
+
   // File operations
 
   rpc Open(OpenReq) returns (stream OpenResp) {}
@@ -82,6 +84,11 @@ message DeleteResp {
 message ReadDirResponse {
   repeated string dirName = 1;
   BaseResponse baseresponse = 2;
+}
+
+message AccessPathRequest {
+  string path = 1;
+  uint64 mode = 2;
 }
 
 message BaseResponse {

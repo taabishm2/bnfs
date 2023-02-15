@@ -47,6 +47,7 @@ using afs::PutFileResp;
 using afs::ReadDirResponse;
 using afs::BaseResponse;
 using afs::SimplePathRequest;
+using afs::AccessPathRequest;
 using afs::StatResponse;
 
 using grpc::Channel;
@@ -148,6 +149,24 @@ int rmdir(const char *fileName)
     if (res < 0) { return res; }
     return 0;
 	}
+
+  int access(const char *path, int mode)
+  {
+    ClientContext context;
+    BaseResponse reply;
+    AccessPathRequest request;
+    request.set_path(path);
+    request.set_mode(mode);
+
+    Status status = stub_->Access(&context, request, &reply);
+    int res = reply.errorcode();
+
+    if (res < 0)
+    {
+      return res;
+    }
+    return 0;
+  }
 
   int Open(const char* path, struct fuse_file_info *fi, bool is_create)
   {
@@ -379,6 +398,10 @@ int AFS_mkdir(AFSClient* client, const char* file_path) {
 
 int AFS_rmdir(AFSClient* client, const char* file_path) {
   return client -> rmdir(file_path);
+}
+
+int AFS_access(AFSClient* client, const char* file_path, int mode) {
+  return client -> access(file_path, mode);
 }
 
 }
