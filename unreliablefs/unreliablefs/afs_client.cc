@@ -152,32 +152,36 @@ int rmdir(const char *fileName)
     return 0;
 	}
 
-  int Open(const char* path, struct fuse_file_info *fi)
+  int Open(const char* path, struct fuse_file_info *fi, bool is_create)
   {
     std::cout << "[log] open: start\n";
     std::string path_str(path);
     OpenReq request;
     request.set_path(path_str);
-    request.set_flag(fi->fh);
+    request.set_flag(fi->flags);
+    request.set_is_create(is_create);
 
     // for getattr()
     SimplePathRequest filepath;
     filepath.set_path(path_str);
-    ClientContext context;
+    ClientContext getattr_context;
+    ClientContext open_context;
     StatResponse getattr_reply;
 
+    string cachepath = "/tmp/cache_new.txt";
+
     // TODO(Sweksha) : Use cache based on GetAttr() result.
-    stub_->GetAttr(&context, filepath, &getattr_reply);
+    // stub_->GetAttr(&getattr_context, filepath, &getattr_reply);
     
     // Get file from server.
     std::cout << "Open: Opening file from server." << std::endl;
     
     OpenResp reply;
 
-
     std::unique_ptr<grpc::ClientReader<OpenResp> > reader(
-        stub_->Open(&context, request));
+        stub_->Open(&open_context, request));
 
+    
     // Read the stream from server. 
     if (!reader->Read(&reply)) {
         std::cout << "[err] Open: failed to download file: " << path_str
@@ -185,10 +189,35 @@ int rmdir(const char *fileName)
         return -EIO;
     }
 
+    // if (reply.file_exists()) {
+    //   string buf = std::string();
+    //   // buf.reserve(size);
+    //   cout << "file exists!!!=====";
+    //     // open file with O_TRUNC
+        
+    //    buf += reply.buf();
+    //     while (reader->Read(&reply)) {
+    //         buf += reply.buf();
+    //     }
+
+    //     Status status = reader->Finish();
+    //     cout << "reader finished!!!=====";
+    //     if (!status.ok()) {
+    //         std::cout << "[err] Open: failed to download from server." << std::endl;
+    //         return -EIO;
+    //     }
+    //     cout << "BROOOOOOO BUF ======" <<  buf;
+
+    //     std::cout << "Open: finish download from server\n";
+    // }
+
     if (reply.file_exists()) {
+      cout << "file exists!!!=====";
         // open file with O_TRUNC
-        std::ofstream ofile(cachepath(path),
+        std::ofstream ofile(cachepath,
             std::ios::binary | std::ios::out | std::ios::trunc);
+            // std::ofstream ofile(cachepath(path),
+            // std::ios::binary | std::ios::out | std::ios::trunc);
         // TODO: check failure
         ofile << reply.buf();
         while (reader->Read(&reply)) {
@@ -196,6 +225,7 @@ int rmdir(const char *fileName)
         }
 
         Status status = reader->Finish();
+        cout << "reader finished!!!=====";
         if (!status.ok()) {
             std::cout << "[err] Open: failed to download from server." << std::endl;
             return -EIO;
@@ -206,17 +236,25 @@ int rmdir(const char *fileName)
     }
     else {
         std::cout << "Open: created a new file\n";
-        close(creat(cachepath(path).c_str(), 00777));
+        // close(creat(cachepath(path).c_str(), 00777));
+        int new_fd = creat(cachepath.c_str(), 00777);
+
+        cout << "NEW CACHE FILE FD=== " << new_fd;
+        close(new_fd);
     }
 
     // give user the file
-    fi->fh = open(cachepath(path).c_str(), fi->flags);
-    if (fi->fh < 0) {
+    // fi->fh = open(cachepath(path).c_str(), fi->flags);
+    cout << "==== before OPEN LOCAL TO cachepath: " << cachepath;
+    int ret = open(cachepath.c_str(), fi->flags);
+    if (ret < 0) {
         std::cout << "[err] Open: error open downloaded cache file.\n";
         return -errno;
     }
 
-    return 0;
+    cout << "==== cachepath: " << cachepath << " AFTER fd " << fi->fh;
+
+    return ret;
   }
 
   int Close(const char* file_path)
@@ -302,8 +340,8 @@ AFSClient* NewAFSClient(char* cache_root) {
   return client;
 }
 
-int AFS_open(AFSClient* client, const char* file_path, struct fuse_file_info *fi) {
-  return client -> Open(file_path, fi);
+int AFS_open(AFSClient* client, const char* file_path, struct fuse_file_info *fi, bool is_create) {
+  return client -> Open(file_path, fi, is_create);
 }
 
 int AFS_close(AFSClient* client, const char* file_path) {

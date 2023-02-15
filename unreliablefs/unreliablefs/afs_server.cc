@@ -38,10 +38,6 @@ using grpc::Status;
 using namespace std;
 
 #define BUFSIZE 65500
-#define FS_ROOT "fs_root"
-#define CACHE "cache"
-
-std::string AFS_ROOT_DIR;
 
 char *getServerPath(string path)
 {
@@ -143,27 +139,34 @@ class FileServerServiceImpl final : public FileServer::Service
     {
         cout << "Recieved Open RPC from client!" << endl;
         OpenResp reply;
-        // string path = request->path();
-        // TOD0(Sweksha) : Use getServerFilepath
-        string path = getServerFilepath(request->path());
+        string path = getServerPath(request->path());
         ifstream file(path, ios::in);
         cout << "Opening: " << path << "\n";
 
         if (!file.is_open())
         {
             reply.set_file_exists(false);
+            if (request->is_create()) {
+                if (open(path.c_str(), request->flag(), 00777) == -1) {
+                    reply.set_err(errno);
+                }
+            }
             writer->Write(reply);
             return Status::OK;
         }
+        cout << "File exists";
         reply.set_file_exists(true);
 
         string buf(BUFSIZE, '\0');
+         cout << "Reading";
         while (file.read(&buf[0], BUFSIZE))
         {
+             cout << "set buf";
             reply.set_buf(buf);
             if (!writer->Write(reply))
                 break;
         }
+         cout << "reached eof";
         // reached eof
         if (file.eof())
         {
@@ -171,6 +174,7 @@ class FileServerServiceImpl final : public FileServer::Service
             reply.set_buf(buf);
             writer->Write(reply);
         }
+         cout << "closing File";
         file.close();
         // reply.set_err(read_res);
         return Status::OK;
@@ -197,17 +201,6 @@ class FileServerServiceImpl final : public FileServer::Service
     }
 
 private:
-    const std::string getServerFilepath(std::string filepath, bool is_cache_filepath = false)
-    {
-        if (is_cache_filepath)
-            return (AFS_ROOT_DIR + CACHE + "/" + hashFilepath(filepath));
-        else
-            return (AFS_ROOT_DIR + FS_ROOT + "/" + filepath);
-    }
-    const std::string getServerFilepath(const char *filepath, bool is_cache_filepath = false)
-    {
-        return getServerFilepath(std::string(filepath), is_cache_filepath);
-    }
     void log(char *msg)
     {
         std::cout << "[log] " << msg << std::endl;

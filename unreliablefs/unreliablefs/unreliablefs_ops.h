@@ -4,6 +4,7 @@
 #define FUSE_USE_VERSION 29
 
 #include <fuse.h>
+#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -21,7 +22,7 @@ int AFS_mkdir(AFSClient* client, const char* file_path);
 
 int AFS_rmdir(AFSClient* client, const char* file_path);
 
-int AFS_open(AFSClient* client, const char* file_path, struct fuse_file_info *fi);
+int AFS_open(AFSClient* client, const char* file_path, struct fuse_file_info *fi, bool is_create);
 
 int AFS_close(AFSClient* v, const char* file_path);
 

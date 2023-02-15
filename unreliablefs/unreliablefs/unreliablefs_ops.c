@@ -249,6 +249,7 @@ int unreliable_truncate(const char *path, off_t length)
 
 int unreliable_open(const char *path, struct fuse_file_info *fi)
 {
+    printf("IN unreliable_open");
     int ret = error_inject(path, OP_OPEN);
     if (ret == -ERRNO_NOOP) {
         return 0;
@@ -257,13 +258,8 @@ int unreliable_open(const char *path, struct fuse_file_info *fi)
     }
 
     // Open call to server.
-	ret = AFS_open(afsClient, path, fi);
+	ret = AFS_open(afsClient, path, fi, false);
     if (ret < 0) {
-        return -errno;
-    }
-
-    ret = open(path, fi->flags);
-    if (ret == -1) {
         return -errno;
     }
     fi->fh = ret;
@@ -281,12 +277,15 @@ int unreliable_read(const char *path, char *buf, size_t size, off_t offset,
         return ret;
     }
 
-    int fd;
+    printf("NOT IMPLEMENTED UNREL FS READ with path=== %s ", path);
 
+    int fd;
     if (fi == NULL) {
-	fd = open(path, O_RDONLY);
+        printf("hi1 I'M NUL :(((((())))))");
+	    fd = open(path, O_RDONLY);
     } else {
-	fd = fi->fh;
+    	fd = fi->fh;
+        printf("HURRAYYYY fd ==== %d\n", fd);
     }
 
     if (fd == -1) {
@@ -294,6 +293,7 @@ int unreliable_read(const char *path, char *buf, size_t size, off_t offset,
     }
 
     ret = pread(fd, buf, size, offset);
+    printf("Contents in Buffer!====== %s", buf);
     if (ret == -1) {
         ret = -errno;
     }
@@ -382,7 +382,7 @@ int unreliable_release(const char *path, struct fuse_file_info *fi)
     } else if (ret) {
         return ret;
     }
-    
+    printf("CALLING CLOSE in unreliable_release");
     // Flush changes from local file to afs.
 	AFS_close(afsClient, path);
 
@@ -660,14 +660,16 @@ int unreliable_create(const char *path, mode_t mode,
     } else if (ret) {
         return ret;
     }
-
-    ret = open(path, fi->flags, mode);
-    if (ret == -1) {
+    
+    // Open call to server.
+	ret = AFS_open(afsClient, path, fi, true);
+    if (ret < 0) {
         return -errno;
     }
+
     fi->fh = ret;
 
-    return 0;    
+    return 0;
 }
 
 int unreliable_ftruncate(const char *path, off_t length,
@@ -716,10 +718,14 @@ int unreliable_lock(const char *path, struct fuse_file_info *fi, int cmd,
         return ret;
     }
 
+   printf("in unreliable_lock");
+
     ret = fcntl((int) fi->fh, cmd, fl);
     if (ret == -1) {
+        printf("error in unreliable_lock");
         return -errno;
     }
+    printf("no error in unreliable_lock");
 
     return 0;
 }

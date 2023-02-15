@@ -24,6 +24,7 @@ service FileServer {
 message OpenReq {
   string path = 1;
   int32 flag = 2;
+  optional bool is_create = 3;
 }
 
 message OpenResp {
