@@ -71,6 +71,7 @@ message PutFileReq {
 
 message PutFileResp {
   int32 err = 1;
+  uint64 lastModifiedTime = 2;   /* time of last modification */
 }
 
 message DeleteReq {

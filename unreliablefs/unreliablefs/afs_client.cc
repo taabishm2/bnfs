@@ -271,15 +271,16 @@ int rmdir(const char *fileName)
 
   int Close(const char* file_path) {
 
-    // Read file from cache and make gRPC put file writes.
-    // string cache_path = cache_helper.getCachedPath(file_path);
-    ifstream file(file_path, ios::in);
-    if(!file) {
-      cout << "File not found at path " << file_path << endl;
+    // Get temp file path to close.
+    string temp_path = cache_helper -> getTempPath(file_path);
 
-      return -1;
+    ifstream file(temp_path, ios::in);
+    if(!file) {
+      cout << "File " << file_path << " not found in temp dir. Returning success\n";
+
+      return 0;
     }
-    cout << "Putting file contents from path: " << file_path << "\n";
+    cout << "PutFiile " << temp_path << " to server\n";
 
     // Prepare grpc messages.
     ClientContext context;
@@ -288,6 +289,15 @@ int rmdir(const char *fileName)
 
     std::unique_ptr<ClientWriter<PutFileReq>> writer(stub_->PutFile(&context, &reply));
     string buf(BUFSIZE, '\0');
+
+    // Send one request for filepath.
+    request.set_path(file_path);
+    if (!writer->Write(request)) {
+      // cache uncommit.
+
+      return -1;
+    }
+
     while (!file.eof()) {
       // Read file contents into buf.
       file.read(&buf[0], BUFSIZE);
@@ -305,6 +315,8 @@ int rmdir(const char *fileName)
     }
     writer->WritesDone();
     Status status = writer->Finish();
+
+    cout << "got last modification time " << reply.lastmodifiedtime();
     
     if (!status.ok()) {
       cout << "PutFile rpc failed: " << status.error_message() << std::endl;
@@ -317,8 +329,8 @@ int rmdir(const char *fileName)
     else {
       cout << "Finished sending file with path " << file_path << endl;
 
-      // commit cache changes.
-      // cache_helper.commit(file_path);
+      // commit temp file to cache.
+      cache_helper -> commitToCache(file_path, reply.lastmodifiedtime());
     }
 
     return 0;

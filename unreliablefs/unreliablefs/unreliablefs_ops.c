@@ -820,6 +820,7 @@ int unreliable_utimens(const char *path, const struct timespec ts[2])
     }
 
     /* don't use utime/utimes since they follow symlinks */
+    printf("I am being called\n");
     ret = utimensat(0, path, ts, AT_SYMLINK_NOFOLLOW);
     if (ret == -1) {
         return -errno;

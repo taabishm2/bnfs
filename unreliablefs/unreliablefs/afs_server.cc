@@ -51,6 +51,21 @@ char *getServerPath(string path)
     return result;
 }
 
+string random_string(const int len) {
+    static const char alphanum[] =
+        "0123456789"
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        "abcdefghijklmnopqrstuvwxyz";
+    string tmp_s;
+    tmp_s.reserve(len);
+
+    for (int i = 0; i < len; ++i) {
+        tmp_s += alphanum[rand() % (sizeof(alphanum) - 1)];
+    }
+    
+    return tmp_s;
+}
+
 class FileServerServiceImpl final : public FileServer::Service
 {
     Status GetAttr(ServerContext *context, const SimplePathRequest *request,
@@ -197,12 +212,39 @@ class FileServerServiceImpl final : public FileServer::Service
         PutFileResp *reply) override {
         PutFileReq request;
 
+        ofstream outfile;
+        string file_path, temp_file_path, cache_path;
+        if(reader->Read(&request)) {
+            file_path = request.path();
+            cache_path = getServerPath(file_path);
+            temp_file_path = cache_path +  random_string(20);
+
+            // open file using append mode.
+            // This should create a file if not exists.
+            outfile.open(temp_file_path, std::ios_base::app);
+        }
+        cout << "writing to temp file path " << temp_file_path << endl;
+
         while (reader->Read(&request)) {
-            cout << "got PutFile request for path " << request.path() <<
-            " contents " << request.contents() << endl;
+            // write contents.
+            outfile << request.contents();
+        }
+
+        // Rename temp_file_path to file_path.
+        string cp_command = "mv -f " + temp_file_path + " " + cache_path;
+        int status = system(cp_command.c_str());
+        if (status == -1)
+            return Status::CANCELLED;
+
+        // Set file server modification time.
+        struct stat stbuf;
+        int res = lstat(getServerPath(cache_path), &stbuf);
+        if (res != 0) {
+            return Status::CANCELLED;
         }
 
         reply->set_err(0);
+        reply->set_lastmodifiedtime(stbuf.st_mtime);
         return Status::OK;
     }
 
