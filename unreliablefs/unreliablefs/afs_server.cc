@@ -251,12 +251,12 @@ class FileServerServiceImpl final : public FileServer::Service
     Status Unlink(ServerContext *context, const UnlinkReq *request,
                   UnlinkResp *reply) override
     {
-        cout << "Recieved Delete RPC from client!" << endl;
-
-        // Perform unlink on path.
         string file_path = request -> path();
         string cache_path = getServerPath(file_path);
 
+        cout << "Server Unlink: " << file_path << endl;
+
+        // Perform unlink on path.
         int ret = unlink(cache_path.c_str());
         if (ret != 0) {
             reply -> set_err(ret);

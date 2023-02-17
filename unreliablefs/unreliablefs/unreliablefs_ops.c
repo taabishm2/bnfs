@@ -136,9 +136,10 @@ int unreliable_unlink(const char *path)
         return ret;
     }
 
-    ret = unlink(path); 
-    if (ret == -1) {
-        return -errno;
+    // Unlink call to server.
+	ret = AFS_unlink(afsClient, path);
+    if (ret < 0) {
+        return ret;
     }
 
     return 0;
@@ -259,7 +260,7 @@ int unreliable_open(const char *path, struct fuse_file_info *fi)
     // Open call to server.
 	ret = AFS_open(afsClient, path, fi, false);
     if (ret < 0) {
-        return -errno;
+        return ret;
     }
     fi->fh = ret;
 
