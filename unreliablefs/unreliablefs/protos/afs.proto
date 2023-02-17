@@ -11,7 +11,7 @@ service FileServer {
 
   rpc ReadDir(SimplePathRequest) returns (ReadDirResponse) {}
 
-  rpc Mkdir(SimplePathRequest) returns (BaseResponse) {}
+  rpc Mkdir(MkdirReq) returns (BaseResponse) {}
 
   rpc Rmdir(SimplePathRequest) returns (BaseResponse) {}
 
@@ -41,6 +41,11 @@ message OpenResp {
 
 message SimplePathRequest {
   string path = 1;
+}
+
+message MkdirReq {
+  string path = 1;
+  int32 mode = 2;
 }
 
 message StatResponse {

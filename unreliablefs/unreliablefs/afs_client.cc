@@ -43,6 +43,7 @@ using afs::BaseResponse;
 using afs::UnlinkReq;
 using afs::UnlinkResp;
 using afs::FileServer;
+using afs::MkdirReq;
 using afs::OpenReq;
 using afs::OpenResp;
 using afs::PutFileReq;
@@ -127,12 +128,14 @@ extern "C"
       return 0;
     }
 
-    int mkdir(const char *fileName)
+    int mkdir(const char *fileName, mode_t mode)
     {
       ClientContext context;
       BaseResponse reply;
-      SimplePathRequest request;
+      MkdirReq request;
+
       request.set_path(fileName);
+      request.set_mode(mode);
 
       Status status = stub_->Mkdir(&context, request, &reply);
       int res = reply.errorcode();
@@ -432,9 +435,9 @@ extern "C"
     return client->readDir(path, path, buf, filler);
   }
 
-  int AFS_mkdir(AFSClient *client, const char *file_path)
+  int AFS_mkdir(AFSClient *client, const char *file_path, mode_t mode)
   {
-    return client->mkdir(file_path);
+    return client->mkdir(file_path, mode);
   }
 
   int AFS_rmdir(AFSClient *client, const char *file_path)

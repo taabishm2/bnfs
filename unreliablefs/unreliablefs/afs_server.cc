@@ -22,6 +22,7 @@ using afs::BaseResponse;
 using afs::UnlinkReq;
 using afs::UnlinkResp;
 using afs::FileServer;
+using afs::MkdirReq;
 using afs::OpenReq;
 using afs::OpenResp;
 using afs::PutFileReq;
@@ -125,11 +126,12 @@ class FileServerServiceImpl final : public FileServer::Service
         return Status::OK;
     }
 
-    Status Mkdir(ServerContext *context, const SimplePathRequest *request,
+    Status Mkdir(ServerContext *context, const MkdirReq *request,
                  BaseResponse *reply)
     {
-        cout << "SERVER: Mkdir " << request->path().c_str() << endl;
-        int res = mkdir(getServerPath(request->path()), 777);
+        cout << "SERVER: Mkdir " << request->path().c_str() << 
+        " mode " << request -> mode() << endl;
+        int res = mkdir(getServerPath(request->path()), request -> mode());
 
         if (res == -1)
             reply->set_errorcode(-errno);

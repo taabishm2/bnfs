@@ -564,7 +564,7 @@ int unreliable_mkdir(const char *path, mode_t mode)
         return ret;
     }
 
-	return AFS_mkdir(afsClient, path);
+	return AFS_mkdir(afsClient, path, mode);
 }
 
 int unreliable_rmdir(const char *path)

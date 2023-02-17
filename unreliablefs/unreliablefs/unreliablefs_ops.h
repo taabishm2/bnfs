@@ -21,7 +21,7 @@ int AFS_getAttr(AFSClient* client, const char* file_path, struct stat *buf);
 
 int AFS_readDir(AFSClient* client, const char *path, void *buf, fuse_fill_dir_t filler);
 
-int AFS_mkdir(AFSClient* client, const char* file_path);
+int AFS_mkdir(AFSClient* client, const char* file_path, mode_t mode);
 
 int AFS_rmdir(AFSClient* client, const char* file_path);
 
