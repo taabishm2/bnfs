@@ -73,17 +73,19 @@ string  CacheHelper::getCachePath(void)
 
     string  CacheHelper::getHashedPath(const char *rel_path)
     {
-        unsigned char hash[SHA256_DIGEST_LENGTH];
-        SHA256_CTX sha256;
-        SHA256_Init(&sha256);
-        SHA256_Update(&sha256, rel_path, strlen(rel_path));
-        SHA256_Final(hash, &sha256);
+        // TODO: Unomment below
+        return rel_path;
+        // unsigned char hash[SHA256_DIGEST_LENGTH];
+        // SHA256_CTX sha256;
+        // SHA256_Init(&sha256);
+        // SHA256_Update(&sha256, rel_path, strlen(rel_path));
+        // SHA256_Final(hash, &sha256);
 
-        stringstream ss;
-        for (int i = 0; i < SHA256_DIGEST_LENGTH; ++i)
-            ss << hex << setw(2) << setfill('0') << ((int)hash[i]);
+        // stringstream ss;
+        // for (int i = 0; i < SHA256_DIGEST_LENGTH; ++i)
+        //     ss << hex << setw(2) << setfill('0') << ((int)hash[i]);
 
-        return ss.str();
+        // return ss.str();
     }
 
     string  CacheHelper::getCachePath(const char *rel_path)
@@ -155,31 +157,35 @@ string  CacheHelper::getCachePath(void)
 
     bool CacheHelper::isCacheOutOfDate(const char *path, int server_modified_at_epoch, int *file_descriptor, bool close_file, int open_mode)
     {
+        cout << "[LOG] checking out-of-date" << endl;
         bool file_exists_in_cache = getCheckInCache(path, file_descriptor, false, open_mode);
 
-        if (!file_exists_in_cache)
+        if (!file_exists_in_cache) {
+            cout << "[LOG] file not exists - OOD" << endl;
             return true;
+        }
 
         struct stat file_stat;
         fstat(*file_descriptor, &file_stat);
 
-        time_t local_modified_at = file_stat.st_mtim.tv_nsec;
-        int local_modified_at_epoch = static_cast<int>(local_modified_at);
+        int local_modified_at_epoch = static_cast<int>(static_cast<time_t>(file_stat.st_mtim.tv_sec));
 
         if (file_exists_in_cache && close_file)
             close(*file_descriptor);
 
-        return server_modified_at_epoch >= local_modified_at_epoch;
+        cout << "[LOG] file exists - OOD: " << server_modified_at_epoch << ":" << local_modified_at_epoch << endl;
+
+        return server_modified_at_epoch > local_modified_at_epoch;
     }
 
     /* Returns file descriptor of cache file */
-    int  CacheHelper::syncFileServerToCache(const char *path, const char *data, bool close_file, int open_mode)
+    int  CacheHelper::syncFileToCache(const char *path, const char *data, bool close_file, int open_mode)
     {
         string cache_path = getCachePath(path);
-        ofstream file(cache_path, std::ios::binary);
-        if (!file.is_open())
+        ofstream file(cache_path, ios::out);
+        if (!file || !file.is_open())
         {
-            cerr << "Failed to sync file: " << path << endl;
+            cerr << "Failed to sync cache file: " << path << endl;
             return -1;
         }
 
@@ -189,6 +195,27 @@ string  CacheHelper::getCachePath(void)
         int file_descriptor = -1;
         if (!close_file)
             file_descriptor = open(cache_path.c_str(), open_mode);
+
+        return file_descriptor;
+    }
+
+    /* Returns file descriptor of temp file */
+    int  CacheHelper::syncFileToTemp(const char *path, const char *data, bool close_file, int open_mode)
+    {
+        string temp_path = getTempPath(path);
+        ofstream file(temp_path, ios::out);
+        if (!file || !file.is_open())
+        {
+            cerr << "Failed to sync temp file: " << path << endl;
+            return -1;
+        }
+
+        file.write(data, strlen(data));
+        file.close();
+
+        int file_descriptor = -1;
+        if (!close_file)
+            file_descriptor = open(temp_path.c_str(), open_mode);
 
         return file_descriptor;
     }
@@ -245,9 +272,9 @@ string  CacheHelper::getCachePath(void)
         cout << "Completed init()" << endl;
     }
 
-    bool CacheHelper::canOpenFile(const char *path)
+    bool CacheHelper::isFileDirty(const char *path)
     {
-        return !(dirty_files.find(getHashedPath(path)) != dirty_files.end());
+        return dirty_files.find(getHashedPath(path)) != dirty_files.end();
     }
 
     void CacheHelper::markFileDirty(const char *path)
@@ -255,107 +282,13 @@ string  CacheHelper::getCachePath(void)
         dirty_files.insert(getHashedPath(path));
     }
 
+    void CacheHelper::deleteFromTemp(const char *path) {
+        std::remove(getTempPath(path).c_str());
+        dirty_files.erase(getHashedPath(path));
+    }
+
     CacheHelper* NewCacheHelper()
     {
         CacheHelper *helper = new CacheHelper();
         return helper;
     }
-
-// int main()
-//     {
-//         /* Tested */
-//         initCache();
-
-//         /* Tested */
-//         cout << getCachePath("/dirname/test1.txt") << endl;
-
-//         /* Tested */
-//         cout << "A" << endl;
-//         syncFileServerToCache("/dirname/abc.txt", "hello world\nthis is a file\n", true, O_RDONLY);
-
-//         /* Tested */
-//         cout << "B" << endl;
-//         syncFileServerToCache("/dirname/abc.txt", "Hey new changes!\n", true, O_RDONLY);
-
-//         /* Tested */
-//         cout << "C" << endl;
-//         int fd;
-//         string tmp_txt = "hello from temp file!\n";
-//         bool ok = getCheckInTemp("/dirname/test1.txt", &fd, false, O_WRONLY, true);
-//         if (ok)
-//         {
-//             write(fd, tmp_txt.c_str(), tmp_txt.length());
-//             cout << "OK - created and wrote new" << endl;
-//             close(fd);
-//         }
-
-//         /* Tested */
-//         cout << "D" << endl;
-//         ok = getCheckInTemp("/dirname/test2.txt", &fd, true, O_RDONLY, false);
-//         if (!ok)
-//         {
-//             cout << "OK - Couldn't find in temp" << endl;
-//         }
-
-//         cout << "E" << endl;
-//         ok = getCheckInTemp("/dirname/test1.txt", &fd, true, O_RDONLY, false);
-//         if (ok)
-//         {
-//             cout << "OK - Read from temp" << endl;
-//         }
-
-//         cout << "F" << endl;
-//         string cmd = "touch " + getCachePath("/dir/newfile.txt");
-//         system(cmd.c_str());
-//         ok = getCheckInTemp("/dir/newfile.txt", &fd, true, O_RDONLY, true);
-//         if (ok)
-//         {
-//             cout << "OK - Read from cache->temp" << endl;
-//         }
-
-//         /* Tested */
-//         cout << "G" << endl;
-//         commitToCache("/dirname/test1.txt", 1581788940);
-
-//         return 0;
-//     }
-
-// void Cache_initCache(CacheHelper *helper)
-// {
-//     return helper->initCache();
-// }
-
-// bool Cache_getCheckInCache(CacheHelper *helper, const char *path, int *file_descriptor, bool close_file, int open_mode)
-// {
-//     return helper->getCheckInCache(path, file_descriptor, close_file, open_mode);
-// }
-
-// bool Cache_getCheckInTemp(CacheHelper *helper, const char *path, int *file_descriptor, bool close_file, int open_mode, bool create_new)
-// {
-//     return helper->getCheckInTemp(path, file_descriptor, close_file, open_mode, create_new);
-// }
-
-// bool Cache_isCacheOutOfDate(CacheHelper *helper, const char *path, int server_modified_at_epoch, int *file_descriptor, bool close_file, int open_mode)
-// {
-//     return helper->isCacheOutOfDate(path, server_modified_at_epoch, file_descriptor, close_file, open_mode);
-// }
-
-// int Cache_syncFileServerToCache(CacheHelper *helper, const char *path, const char *data, bool close_file, int open_mode)
-// {
-//     return helper->syncFileServerToCache(path, data, close_file, open_mode);
-// }
-
-// int Cache_commitToCache(CacheHelper *helper, const char *path, int server_modified_at_epoch)
-// {
-//     return helper->commitToCache(path, server_modified_at_epoch);
-// }
-
-// bool Cache_canOpenFile(CacheHelper *helper, const char *path)
-// {
-//     return helper->canOpenFile(path);
-// }
-
-// void Cache_markFileDirty(CacheHelper *helper, const char *path)
-// {
-//     helper->markFileDirty(path);
-// }
