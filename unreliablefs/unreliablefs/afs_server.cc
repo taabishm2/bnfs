@@ -242,14 +242,14 @@ class FileServerServiceImpl final : public FileServer::Service
 
         // // Set file server modification time.
         struct stat stbuf;
-        int res = lstat(getServerPath(cache_path), &stbuf);
+        int res = lstat(cache_path.c_str(), &stbuf);
         if (res != 0) {
             cout << "lstat call failed\n";
             return Status::CANCELLED;
         }
 
         reply->set_err(0);
-        // reply->set_lastmodifiedtime(stbuf.st_mtime);
+        reply->set_lastmodifiedtime(stbuf.st_mtime);
         return Status::OK;
     }
 
