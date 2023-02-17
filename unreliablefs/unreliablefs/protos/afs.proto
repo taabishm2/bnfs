@@ -23,7 +23,7 @@ service FileServer {
 
   rpc PutFile(stream PutFileReq) returns (PutFileResp) {} 
 
-  rpc Delete(DeleteReq) returns (DeleteResp) {}
+  rpc Unlink(UnlinkReq) returns (UnlinkResp) {}
 }
 
 message OpenReq {
@@ -74,11 +74,11 @@ message PutFileResp {
   uint64 lastModifiedTime = 2;   /* time of last modification */
 }
 
-message DeleteReq {
+message UnlinkReq {
   string path = 1;
 }
 
-message DeleteResp {
+message UnlinkResp {
   int32 err = 1;
 }
 

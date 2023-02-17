@@ -40,8 +40,8 @@
 
 using afs::AccessPathRequest;
 using afs::BaseResponse;
-using afs::DeleteReq;
-using afs::DeleteResp;
+using afs::UnlinkReq;
+using afs::UnlinkResp;
 using afs::FileServer;
 using afs::OpenReq;
 using afs::OpenResp;
@@ -50,6 +50,8 @@ using afs::PutFileResp;
 using afs::ReadDirResponse;
 using afs::SimplePathRequest;
 using afs::StatResponse;
+using afs::UnlinkReq;
+using afs::UnlinkResp;
 
 using grpc::Channel;
 using grpc::ClientContext;
@@ -306,7 +308,32 @@ extern "C"
 
       cout << "FLAGS ARE: " << bA << " " << bB << " " << bC << " " << bD << " " << bE << endl;
       return (bA << 4) | (bB << 3) | (bC << 2) | (bD << 1) | bE;
+
     }
+
+    int Unlink(const char* file_path) {
+    // Remove file from cache and temp.
+
+    // Remove file from server.
+
+    // Prepare grpc messages.
+    ClientContext context;
+    UnlinkReq request;
+    UnlinkResp reply;
+
+    request.set_path(file_path);
+
+    Status status = stub_->Unlink(&context, request, &reply);
+    
+    if (!status.ok())
+		{
+      cout << "unlink rpc failed" << endl;
+
+      return -1;
+    }
+
+    return 0;
+  }
 
     int Close(const char *path)
     {
@@ -418,5 +445,9 @@ extern "C"
   int AFS_access(AFSClient *client, const char *file_path, int mode)
   {
     return client->access(file_path, mode);
+  }
+
+  int AFS_unlink(AFSClient* client, const char* file_path) {
+    return client -> Unlink(file_path);
   }
 }

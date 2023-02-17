@@ -2,7 +2,7 @@
 #include <memory>
 #include <string>
 #include <fcntl.h>  /* For O_RDWR */
-#include <unistd.h> /* For open(), creat() */
+#include <unistd.h> /* For open(), create(), unlink() */
 #include <fstream>
 #include <sstream>
 #include <iomanip>
@@ -19,8 +19,8 @@
 #include "afs.grpc.pb.h"
 
 using afs::BaseResponse;
-using afs::DeleteReq;
-using afs::DeleteResp;
+using afs::UnlinkReq;
+using afs::UnlinkResp;
 using afs::FileServer;
 using afs::OpenReq;
 using afs::OpenResp;
@@ -248,10 +248,20 @@ class FileServerServiceImpl final : public FileServer::Service
         return Status::OK;
     }
 
-    Status Delete(ServerContext *context, const DeleteReq *request,
-                  DeleteResp *reply) override
+    Status Unlink(ServerContext *context, const UnlinkReq *request,
+                  UnlinkResp *reply) override
     {
         cout << "Recieved Delete RPC from client!" << endl;
+
+        // Perform unlink on path.
+        string file_path = request -> path();
+        string cache_path = getServerPath(file_path);
+
+        int ret = unlink(cache_path.c_str());
+        if (ret != 0) {
+            reply -> set_err(ret);
+            return Status::CANCELLED;
+        }
 
         reply->set_err(0);
         return Status::OK;
