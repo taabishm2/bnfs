@@ -93,7 +93,7 @@ message AccessPathRequest {
 }
 
 message BaseResponse {
-  uint64 errorcode = 1;
+  int32 errorcode = 1;
   string errormessage = 2;
 }
 

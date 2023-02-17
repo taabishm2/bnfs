@@ -46,18 +46,26 @@ struct CacheHelper
     bool isCacheOutOfDate(const char *path, int server_modified_at_epoch, int *file_descriptor, bool close_file, int open_mode);
 
     /* Returns file descriptor of cache file */
-    int syncFileServerToCache(const char *path, const char *data, bool close_file, int open_mode);
+    int syncFileToCache(const char *path, const char *data, bool close_file, int open_mode);
+
+    /* Returns file descriptor of temp file */
+    int syncFileToTemp(const char *path, const char *data, bool close_file, int open_mode);
 
     bool setFileModifiedTime(const char *path, int epoch_time);
 
     /* Returns status: 0 is success, else failure */
     int commitToCache(const char *path, int server_modified_at_epoch);
 
+    // int syncCacheToTemp(const char *path);
+
     void initCache();
 
-    bool canOpenFile(const char *path);
+    bool isFileDirty(const char *path);
 
     void markFileDirty(const char *path);
+
+    void deleteFromTemp(const char *path);
+
 };
 
 static std::unordered_set<string> dirty_files;

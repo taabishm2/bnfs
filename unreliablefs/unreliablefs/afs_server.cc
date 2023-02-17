@@ -173,6 +173,7 @@ class FileServerServiceImpl final : public FileServer::Service
 
         if (!file.is_open())
         {
+            cout << "File NOT exists, to be created: " << request->is_create();
             reply.set_file_exists(false);
             if (request->is_create()) {
                 if (open(path.c_str(), request->flag(), 00777) == -1) {
@@ -208,8 +209,7 @@ class FileServerServiceImpl final : public FileServer::Service
         return Status::OK;
     }
 
-    Status PutFile(ServerContext *context, ServerReader<PutFileReq> *reader,
-        PutFileResp *reply) override {
+    Status PutFile(ServerContext *context, ServerReader<PutFileReq> *reader, PutFileResp *reply) override {
         PutFileReq request;
 
         ofstream outfile;
@@ -257,25 +257,6 @@ class FileServerServiceImpl final : public FileServer::Service
         return Status::OK;
     }
 
-private:
-    void log(char *msg)
-    {
-        std::cout << "[log] " << msg << std::endl;
-    }
-    const std::string hashFilepath(std::string filepath)
-    {
-        unsigned char hash[SHA256_DIGEST_LENGTH];
-        SHA256_CTX sha256;
-        SHA256_Init(&sha256);
-        SHA256_Update(&sha256, filepath.c_str(), filepath.size());
-        SHA256_Final(hash, &sha256);
-        std::stringstream ss;
-        for (int i = 0; i < SHA256_DIGEST_LENGTH; ++i)
-        {
-            ss << std::hex << std::setw(2) << std::setfill('0') << ((int)hash[i]);
-        }
-        return ss.str();
-    }
 };
 
 void RunServer()

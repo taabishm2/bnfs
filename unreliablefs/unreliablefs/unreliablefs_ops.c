@@ -332,7 +332,8 @@ int unreliable_write(const char *path, const char *buf, size_t size,
         ret = -errno;
     }
 
-    markFileDirty(path);
+    // TODO: Un-comment this
+    //markFileDirty(path);
 
     if(fi == NULL) {
         close(fd);
