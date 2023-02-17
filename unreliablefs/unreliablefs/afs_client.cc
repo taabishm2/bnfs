@@ -214,6 +214,7 @@ extern "C"
       return (o_fl == 8 || o_fl == 9 || o_fl == 10 || o_fl == 11 || o_fl == 24 || o_fl == 25 || o_fl == 26 || o_fl == 27);
     }
 
+    // Returns file descriptor to local file copy on success.
     int Open(const char *path, struct fuse_file_info *fi, bool is_create)
     {
       int temp_fd, cache_fd;
@@ -249,7 +250,6 @@ extern "C"
       cout << "[LOG] Final FID: " << temp_fd << endl;
       if (temp_fd > -1)
       {
-        fi->fh = temp_fd;
         return temp_fd;
       }
 
@@ -452,5 +452,9 @@ extern "C"
 
   int AFS_unlink(AFSClient* client, const char* file_path) {
     return client -> Unlink(file_path);
+  }
+
+  void Cache_markFileDirty(AFSClient* client, const char *path) {
+    return client -> cache_helper -> markFileDirty(file_path);
   }
 }

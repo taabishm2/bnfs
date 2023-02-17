@@ -334,8 +334,7 @@ int unreliable_write(const char *path, const char *buf, size_t size,
         ret = -errno;
     }
 
-    // TODO: Un-comment this
-    //markFileDirty(path);
+    Cache_markFileDirty(afsClient, path);
 
     if(fi == NULL) {
         close(fd);
@@ -664,9 +663,8 @@ int unreliable_create(const char *path, mode_t mode,
     // Open call to server.
 	ret = AFS_open(afsClient, path, fi, true);
     if (ret < 0) {
-        return -errno;
+        return ret;
     }
-
     fi->fh = ret;
 
     return 0;

@@ -47,7 +47,7 @@ int AFS_unlink(AFSClient* client, const char* file_path);
 
 // bool Cache_canOpenFile(CacheHelper *helper, const char *path);
 
-// void Cache_markFileDirty(CacheHelper *helper, const char *path);
+void Cache_markFileDirty(AFSClient* client, const char *path);
 
 #ifdef __cplusplus
 }
