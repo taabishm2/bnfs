@@ -319,6 +319,7 @@ int unreliable_write(const char *path, const char *buf, size_t size,
     int fd;
     (void) fi;
     if(fi == NULL) {
+    printf("this is wrong\n");
 	fd = open(path, O_WRONLY);
     } else {
 	fd = fi->fh;
@@ -456,14 +457,14 @@ int unreliable_getxattr(const char *path, const char *name,
         return ret;
     }
 
-#ifdef __APPLE__
-    ret = getxattr(path, name, value, size, 0, XATTR_NOFOLLOW);
-#else
-    ret = getxattr(path, name, value, size);
-#endif /* __APPLE__ */
-    if (ret == -1) {
-        return -errno;
-    }
+// #ifdef __APPLE__
+//     ret = getxattr(path, name, value, size, 0, XATTR_NOFOLLOW);
+// #else
+//     ret = getxattr(path, name, value, size);
+// #endif /* __APPLE__ */
+//     if (ret == -1) {
+//         return -errno;
+//     }
     
     return 0;
 }
@@ -520,12 +521,12 @@ int unreliable_opendir(const char *path, struct fuse_file_info *fi)
         return ret;
     }
 
-    DIR *dir = opendir(path);
+    // DIR *dir = opendir(path);
 
-    if (!dir) {
-        return -errno;
-    }
-    fi->fh = (int64_t) dir;
+    // if (!dir) {
+    //     return -errno;
+    // }
+    // fi->fh = (int64_t) dir;
 
     return 0;    
 }

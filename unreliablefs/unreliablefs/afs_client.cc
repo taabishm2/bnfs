@@ -380,7 +380,7 @@ extern "C"
       writer->WritesDone();
       Status status = writer->Finish();
 
-      cout << "CLIENT: Got last modification time " << reply.lastmodifiedtime();
+      cout << "CLIENT: Got last modification time " << reply.lastmodifiedtime() << endl;
 
       if (!status.ok())
       {

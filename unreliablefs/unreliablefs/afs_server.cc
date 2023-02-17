@@ -185,19 +185,18 @@ class FileServerServiceImpl final : public FileServer::Service
             writer->Write(reply);
             return Status::OK;
         }
-        cout << "File exists";
+        cout << "File exists\n";
         reply.set_file_exists(true);
 
         string buf(BUFSIZE, '\0');
          cout << "Reading";
         while (file.read(&buf[0], BUFSIZE))
         {
-             cout << "set buf";
             reply.set_buf(buf);
             if (!writer->Write(reply))
                 break;
         }
-         cout << "reached eof";
+         cout << "reached eof\n";
         // reached eof
         if (file.eof())
         {
@@ -205,7 +204,7 @@ class FileServerServiceImpl final : public FileServer::Service
             reply.set_buf(buf);
             writer->Write(reply);
         }
-         cout << "closing File";
+         cout << "closing File\n";
         file.close();
         // reply.set_err(read_res);
         return Status::OK;
@@ -223,7 +222,7 @@ class FileServerServiceImpl final : public FileServer::Service
 
             // open file using append mode.
             // This should create a file if not exists.
-            outfile.open(temp_file_path, std::ios_base::app);
+            outfile.open(temp_file_path, ios::out | ios::app);
         }
         cout << "writing to temp file path " << temp_file_path << endl;
 
@@ -231,22 +230,26 @@ class FileServerServiceImpl final : public FileServer::Service
             // write contents.
             outfile << request.contents();
         }
+        outfile.close();
 
         // Rename temp_file_path to file_path.
         string cp_command = "mv -f " + temp_file_path + " " + cache_path;
         int status = system(cp_command.c_str());
-        if (status == -1)
+        if (status == -1) {
+            cout << "mv system call failed\n";
             return Status::CANCELLED;
+        }
 
-        // Set file server modification time.
+        // // Set file server modification time.
         struct stat stbuf;
         int res = lstat(getServerPath(cache_path), &stbuf);
         if (res != 0) {
+            cout << "lstat call failed\n";
             return Status::CANCELLED;
         }
 
         reply->set_err(0);
-        reply->set_lastmodifiedtime(stbuf.st_mtime);
+        // reply->set_lastmodifiedtime(stbuf.st_mtime);
         return Status::OK;
     }
 
