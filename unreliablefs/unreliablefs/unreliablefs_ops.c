@@ -388,7 +388,7 @@ int unreliable_release(const char *path, struct fuse_file_info *fi)
 
     // Flush changes from local file to afs.
     printf("Close file path %s\n", path);
-	ret = AFS_close(afsClient, path);
+	ret = AFS_flush(afsClient, path);
 
     // Close local cache file descriptor.
     ret = close(fi->fh);

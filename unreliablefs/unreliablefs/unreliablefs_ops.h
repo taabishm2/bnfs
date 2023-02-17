@@ -27,7 +27,7 @@ int AFS_rmdir(AFSClient* client, const char* file_path);
 
 int AFS_open(AFSClient* client, const char* file_path, struct fuse_file_info *fi, bool is_create);
 
-int AFS_close(AFSClient* client, const char* file_path);
+int AFS_flush(AFSClient* client, const char* file_path);
 
 int AFS_access(AFSClient* client, const char* file_path, int mode);
 

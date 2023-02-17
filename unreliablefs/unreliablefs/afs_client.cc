@@ -338,8 +338,13 @@ extern "C"
     return 0;
   }
 
-    int Close(const char *path)
+    int Flush(const char *path)
     {
+      // If the file isn't dirty, return success.
+      if (!cache_helper -> isFileDirty(path)) {
+        return 0;
+      }
+
       // Get temp file path to close.
       string temp_path = cache_helper->getTempPath(path);
 
@@ -393,6 +398,7 @@ extern "C"
         cout << "CLIENT: Finished sending file with path " << path << endl;
         cache_helper->commitToCache(path, reply.lastmodifiedtime());
       }
+      // Note that deleting from temp or commiting to cache unmarks file as dirty.
 
       return 0;
     }
@@ -420,9 +426,9 @@ extern "C"
     return client->Open(file_path, fi, is_create);
   }
 
-  int AFS_close(AFSClient *client, const char *file_path)
+  int AFS_flush(AFSClient *client, const char *file_path)
   {
-    return client->Close(file_path);
+    return client->Flush(file_path);
   }
 
   int AFS_getAttr(AFSClient *client, const char *file_path, struct stat *buf)
@@ -455,6 +461,6 @@ extern "C"
   }
 
   void Cache_markFileDirty(AFSClient* client, const char *path) {
-    return client -> cache_helper -> markFileDirty(file_path);
+    return client -> cache_helper -> markFileDirty(path);
   }
 }
