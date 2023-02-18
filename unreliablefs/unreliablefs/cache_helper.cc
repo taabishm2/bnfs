@@ -279,9 +279,11 @@ bool CacheHelper::isFileDirty(const char *path)
 
 void CacheHelper::markFileDirty(const char *path)
 {
+    cout << "setting path dirty " << path << endl;
     dirty_files.insert(getHashedPath(path));
 }
 
+// TODO (rahul): add try-catch block to make it fail safely.
 void CacheHelper::deleteFromTemp(const char *path) {
     std::remove(getTempPath(path).c_str());
     dirty_files.erase(getHashedPath(path));

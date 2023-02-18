@@ -224,7 +224,7 @@ class FileServerServiceImpl final : public FileServer::Service
             // This should create a file if not exists.
             outfile.open(temp_file_path, ios::out | ios::app);
         }
-        cout << "writing to temp file path " << temp_file_path << endl;
+        cout << "Server PutFile " << file_path << endl;
 
         while (reader->Read(&request)) {
             // write contents.

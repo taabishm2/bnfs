@@ -214,11 +214,41 @@ extern "C"
       return (o_fl == 8 || o_fl == 9 || o_fl == 10 || o_fl == 11 || o_fl == 24 || o_fl == 25 || o_fl == 26 || o_fl == 27);
     }
 
+    int getOpenFlags(bool is_create, const char *path, int *temp_fd, int *cache_fd)
+    {
+      struct stat getAttrData;
+      int getAttrRes = getAttr(path, &getAttrData);
+      cout << "got get attr as " <<  getAttrRes << endl;
+
+      // In case of a is_create call of a file not found on server, 
+      // return 16.
+      if (getAttrRes < 0 && getAttrRes == -ENOENT) {
+        // Also, mark the the file as dirty.
+        cout << "creating file " << endl;
+        cache_helper -> markFileDirty(path);
+
+        return (is_create << 4);
+      }
+
+      bool bA, bB, bC, bD, bE;
+      int server_time = static_cast<int>(static_cast<time_t>(getAttrData.st_atim.tv_sec));
+
+      bA = is_create;
+      bB = cache_helper->getCheckInTemp(path, temp_fd, false, O_RDWR, false);
+      bC = cache_helper->getCheckInCache(path, cache_fd, true, O_RDONLY);
+      bD = getAttrRes == 0;
+      bE = cache_helper->isCacheOutOfDate(path, server_time, cache_fd, true, O_RDONLY);
+
+      cout << "FLAGS ARE: " << bA << " " << bB << " " << bC << " " << bD << " " << bE << endl;
+      return (bA << 4) | (bB << 3) | (bC << 2) | (bD << 1) | bE;
+    }
+
     // Returns file descriptor to local file copy on success.
     int Open(const char *path, struct fuse_file_info *fi, bool is_create)
     {
       int temp_fd, cache_fd;
 
+      // We don't allow opening of dirty files. (to prevent read after write conflicts).
       if (cache_helper->isFileDirty(path))
         return -EIO;
 
@@ -252,6 +282,9 @@ extern "C"
       {
         return temp_fd;
       }
+
+      // Safely delete file in case of open failures.
+      cache_helper -> deleteFromTemp(path);
 
       return -1;
     }
@@ -292,28 +325,6 @@ extern "C"
       return 0;
     }
 
-    int getOpenFlags(bool is_create, const char *path, int *temp_fd, int *cache_fd)
-    {
-      struct stat getAttrData;
-      int getAttrRes = getAttr(path, &getAttrData);
-
-      if (getAttrRes < 0 && getAttrRes != -ENOENT)
-        return getAttrRes;
-
-      bool bA, bB, bC, bD, bE;
-      int server_time = static_cast<int>(static_cast<time_t>(getAttrData.st_atim.tv_sec));
-
-      bA = is_create;
-      bB = cache_helper->getCheckInTemp(path, temp_fd, false, O_RDWR, false);
-      bC = cache_helper->getCheckInCache(path, cache_fd, true, O_RDONLY);
-      bD = getAttrRes == 0;
-      bE = cache_helper->isCacheOutOfDate(path, server_time, cache_fd, true, O_RDONLY);
-
-      cout << "FLAGS ARE: " << bA << " " << bB << " " << bC << " " << bD << " " << bE << endl;
-      return (bA << 4) | (bB << 3) | (bC << 2) | (bD << 1) | bE;
-
-    }
-
     int Unlink(const char* file_path) {
     // Remove file from cache and temp.
 
@@ -338,18 +349,13 @@ extern "C"
     return 0;
   }
 
-    int Flush(const char *path)
-    {
-      // If the file isn't dirty, return success.
-      if (!cache_helper -> isFileDirty(path)) {
-        return 0;
-      }
-
+  int Flush(const char *path)
+   {
       // Get temp file path to close.
       string temp_path = cache_helper->getTempPath(path);
 
       ifstream file(temp_path, ios::in);
-      if (!file || cache_helper->isFileDirty(path))
+      if (!file || !cache_helper->isFileDirty(path))
       {
         cout << "File not present or isn't dirty: " << path << endl;
         return 0;
@@ -462,5 +468,15 @@ extern "C"
 
   void Cache_markFileDirty(AFSClient* client, const char *path) {
     return client -> cache_helper -> markFileDirty(path);
+  }
+
+  char* Cache_path(AFSClient* client, const char *path) {
+    string cache_path = client -> cache_helper -> getCachePath(path);
+    cout << "cache path for " << path << " is " << cache_path << endl; 
+
+    char* res = (char*) malloc(sizeof(char) * cache_path.length());
+    strcpy(res, cache_path.c_str());
+
+    return res;
   }
 }

@@ -387,7 +387,6 @@ int unreliable_release(const char *path, struct fuse_file_info *fi)
     }
 
     // Flush changes from local file to afs.
-    printf("Close file path %s\n", path);
 	ret = AFS_flush(afsClient, path);
 
     // Close local cache file descriptor.
@@ -821,11 +820,12 @@ int unreliable_utimens(const char *path, const struct timespec ts[2])
     }
 
     /* don't use utime/utimes since they follow symlinks */
-    printf("I am being called\n");
-    ret = utimensat(0, path, ts, AT_SYMLINK_NOFOLLOW);
-    if (ret == -1) {
-        return -errno;
-    }
+    // const char* cache_path = Cache_path(afsClient, path);
+    // printf("\n\npath is %s, cache path is %s\n", path, cache_path);
+    // ret = utimensat(0, cache_path, ts, AT_SYMLINK_NOFOLLOW);
+    // if (ret == -1) {
+    //     return -errno;
+    // }
 
     return 0;
 }

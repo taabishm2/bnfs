@@ -49,6 +49,8 @@ int AFS_unlink(AFSClient* client, const char* file_path);
 
 void Cache_markFileDirty(AFSClient* client, const char *path);
 
+char* Cache_path(AFSClient* client, const char *path);
+
 #ifdef __cplusplus
 }
 #endif
