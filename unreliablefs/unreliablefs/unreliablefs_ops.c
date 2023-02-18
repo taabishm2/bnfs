@@ -239,7 +239,8 @@ int unreliable_truncate(const char *path, off_t length)
         return ret;
     }
 
-    ret = truncate(path, length); 
+    const char* cache_path = Cache_path(afsClient, path);
+    ret = truncate(cache_path, length); 
     if (ret == -1) {
         return -errno;
     }
