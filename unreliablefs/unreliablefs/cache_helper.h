@@ -66,6 +66,7 @@ struct CacheHelper
 
     void deleteFromTemp(const char *path);
 
+    void printDirtyFiles(const char *path);
 };
 
 static std::unordered_set<string> dirty_files;

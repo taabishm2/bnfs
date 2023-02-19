@@ -355,9 +355,14 @@ extern "C"
       string temp_path = cache_helper->getTempPath(path);
 
       ifstream file(temp_path, ios::in);
-      if (!file || !cache_helper->isFileDirty(path))
+      if (!file) {
+        cout << "temp file not present: " << temp_path << endl;
+        return -1;
+      }
+
+      if (!cache_helper->isFileDirty(path))
       {
-        cout << "File not present or isn't dirty: " << path << endl;
+        cout << "File isn't dirty: " << path << endl;
         return 0;
       }
 

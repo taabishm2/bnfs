@@ -716,14 +716,10 @@ int unreliable_lock(const char *path, struct fuse_file_info *fi, int cmd,
         return ret;
     }
 
-   printf("in unreliable_lock");
-
     ret = fcntl((int) fi->fh, cmd, fl);
     if (ret == -1) {
-        printf("error in unreliable_lock");
         return -errno;
     }
-    printf("no error in unreliable_lock");
 
     return 0;
 }

@@ -236,7 +236,7 @@ class FileServerServiceImpl final : public FileServer::Service
         string cp_command = "mv -f " + temp_file_path + " " + cache_path;
         int status = system(cp_command.c_str());
         if (status == -1) {
-            cout << "mv system call failed\n";
+            cout << "mv system call " << cp_command << " failed\n";
             return Status::CANCELLED;
         }
 
@@ -244,7 +244,7 @@ class FileServerServiceImpl final : public FileServer::Service
         struct stat stbuf;
         int res = lstat(cache_path.c_str(), &stbuf);
         if (res != 0) {
-            cout << "lstat call failed\n";
+            cout << "lstat call " << cache_path << " failed\n";
             return Status::CANCELLED;
         }
 
