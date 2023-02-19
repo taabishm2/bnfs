@@ -97,6 +97,8 @@ class FileServerServiceImpl final : public FileServer::Service
         reply->set_ctime(stbuf.st_ctime);
 
         reply->mutable_baseresponse()->CopyFrom(baseResponse);
+
+        cout << "SERVER [SUCCESS]" << endl;
         return Status::OK;
     }
 
@@ -123,6 +125,8 @@ class FileServerServiceImpl final : public FileServer::Service
         closedir(dp);
 
         reply->mutable_baseresponse()->CopyFrom(baseResponse);
+
+        cout << "SERVER [SUCCESS]" << endl;
         return Status::OK;
     }
 
@@ -136,6 +140,7 @@ class FileServerServiceImpl final : public FileServer::Service
         if (res == -1)
             reply->set_errorcode(-errno);
             
+        cout << "SERVER [SUCCESS]" << endl;
         return Status::OK;
     }
 
@@ -149,6 +154,7 @@ class FileServerServiceImpl final : public FileServer::Service
         if (res == -1)
             reply->set_errorcode(-errno);
             
+        cout << "SERVER [SUCCESS]" << endl;
         return Status::OK;
     }
 
@@ -161,6 +167,7 @@ class FileServerServiceImpl final : public FileServer::Service
         if (res == -1)
             reply->set_errorcode(-errno);
 
+        cout << "SERVER [SUCCESS]" << endl;
         return Status::OK;
     }
 
@@ -183,6 +190,8 @@ class FileServerServiceImpl final : public FileServer::Service
                 }
             }
             writer->Write(reply);
+
+            cout << "SERVER [SUCCESS]" << endl;
             return Status::OK;
         }
         cout << "File exists\n";
@@ -196,7 +205,8 @@ class FileServerServiceImpl final : public FileServer::Service
             if (!writer->Write(reply))
                 break;
         }
-         cout << "reached eof\n";
+        cout << "reached eof\n";
+
         // reached eof
         if (file.eof())
         {
@@ -206,7 +216,8 @@ class FileServerServiceImpl final : public FileServer::Service
         }
          cout << "closing File\n";
         file.close();
-        // reply.set_err(read_res);
+
+        cout << "SERVER [SUCCESS]" << endl;
         return Status::OK;
     }
 
@@ -237,6 +248,7 @@ class FileServerServiceImpl final : public FileServer::Service
         int status = system(cp_command.c_str());
         if (status == -1) {
             cout << "mv system call " << cp_command << " failed\n";
+            cout << "SERVER [FAILED]" << endl;
             return Status::CANCELLED;
         }
 
@@ -245,11 +257,13 @@ class FileServerServiceImpl final : public FileServer::Service
         int res = lstat(cache_path.c_str(), &stbuf);
         if (res != 0) {
             cout << "lstat call " << cache_path << " failed\n";
+            cout << "SERVER [FAILED]" << endl;
             return Status::CANCELLED;
         }
 
         reply->set_err(0);
         reply->set_lastmodifiedtime(stbuf.st_mtime);
+        cout << "SERVER [SUCCESS]" << endl;
         return Status::OK;
     }
 
@@ -265,10 +279,12 @@ class FileServerServiceImpl final : public FileServer::Service
         int ret = unlink(cache_path.c_str());
         if (ret != 0) {
             reply -> set_err(ret);
+            cout << "SERVER [FAILED]" << endl;
             return Status::CANCELLED;
         }
 
         reply->set_err(0);
+        cout << "SERVER [SUCCESS]" << endl;
         return Status::OK;
     }
 

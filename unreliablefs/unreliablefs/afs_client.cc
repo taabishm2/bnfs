@@ -223,10 +223,6 @@ extern "C"
       // In case of a is_create call of a file not found on server, 
       // return 16.
       if (getAttrRes < 0 && getAttrRes == -ENOENT) {
-        // Also, mark the the file as dirty.
-        cout << "creating file " << endl;
-        cache_helper -> markFileDirty(path);
-
         return (is_create << 4);
       }
 
@@ -258,11 +254,15 @@ extern "C"
       if (requiresCompleteFetchAndSync(o_fl))
         fetchAndSyncServerFile(path, fi, is_create, &temp_fd, &cache_fd);
 
-      else if (requiresCacheToTempSync(o_fl))
+      else if (requiresCacheToTempSync(o_fl)) {
         cache_helper->getCheckInTemp(path, &temp_fd, false, fi->flags, true);
+      }
 
       else if (requiresNewCacheAndTemp (o_fl))
       {
+        // mark file as dirty.
+        cache_helper -> markFileDirty(path);
+
         cache_helper->syncFileToCache(path, "", false, fi->flags);
         temp_fd = cache_helper->syncFileToTemp(path, "", false, fi->flags);
       }

@@ -183,19 +183,6 @@ int  CacheHelper::syncFileToCache(const char *path, const char *data, bool close
 {
     string cache_path = getCachePath(path);
 
-    if(open_mode && O_EXCL) {
-        int file_descriptor = -1;
-        if (!close_file) {
-            cout << "creating new file " << cache_path.c_str() << endl;
-            file_descriptor = open(cache_path.c_str(), open_mode);
-            if(file_descriptor < 0) {
-                printf ("open error no is : %d\n", errno);
-            }
-        }
-
-        return file_descriptor;
-    }
-
     ofstream file(cache_path, ios::out);
     if (!file || !file.is_open())
     {
@@ -205,6 +192,11 @@ int  CacheHelper::syncFileToCache(const char *path, const char *data, bool close
 
     file.write(data, strlen(data));
     file.close();
+
+    // flip O_EXCL if set.
+    if(open_mode & O_EXCL) {
+        open_mode ^= O_EXCL;
+    }
 
     int file_descriptor = -1;
     if (!close_file) {
@@ -223,19 +215,6 @@ int  CacheHelper::syncFileToTemp(const char *path, const char *data, bool close_
 {
     string temp_path = getTempPath(path);
 
-    if(open_mode && O_EXCL) {
-        int file_descriptor = -1;
-        if (!close_file) {
-            cout << "creating new file " << temp_path.c_str() << endl;
-            file_descriptor = open(temp_path.c_str(), open_mode);
-            if(file_descriptor < 0) {
-                printf ("open error no is : %d\n", errno);
-            }
-        }
-
-        return file_descriptor;
-    }
-
     ofstream file(temp_path, ios::out);
     if (!file || !file.is_open())
     {
@@ -245,6 +224,11 @@ int  CacheHelper::syncFileToTemp(const char *path, const char *data, bool close_
 
     file.write(data, strlen(data));
     file.close();
+
+    // flip O_EXCL if set.
+    if(open_mode & O_EXCL) {
+        open_mode ^= O_EXCL;
+    }
 
     int file_descriptor = -1;
     if (!close_file)
