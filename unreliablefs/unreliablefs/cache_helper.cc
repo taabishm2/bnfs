@@ -73,19 +73,19 @@ void  CacheHelper::cleanTempDir()
 
 string  CacheHelper::getHashedPath(const char *rel_path)
 {
-    // TODO: Unomment below
-    return rel_path;
-    // unsigned char hash[SHA256_DIGEST_LENGTH];
-    // SHA256_CTX sha256;
-    // SHA256_Init(&sha256);
-    // SHA256_Update(&sha256, rel_path, strlen(rel_path));
-    // SHA256_Final(hash, &sha256);
+    // TODO: Uncomment below
+    // return rel_path;
+    unsigned char hash[SHA256_DIGEST_LENGTH];
+    SHA256_CTX sha256;
+    SHA256_Init(&sha256);
+    SHA256_Update(&sha256, rel_path, strlen(rel_path));
+    SHA256_Final(hash, &sha256);
 
-    // stringstream ss;
-    // for (int i = 0; i < SHA256_DIGEST_LENGTH; ++i)
-    //     ss << hex << setw(2) << setfill('0') << ((int)hash[i]);
+    stringstream ss;
+    for (int i = 0; i < SHA256_DIGEST_LENGTH; ++i)
+        ss << hex << setw(2) << setfill('0') << ((int)hash[i]);
 
-    // return ss.str();
+    return ss.str();
 }
 
 string  CacheHelper::getCachePath(const char *rel_path)

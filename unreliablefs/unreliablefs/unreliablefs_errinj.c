@@ -184,8 +184,8 @@ int error_inject(const char* path, fuse_op operation)
     TAILQ_FOREACH(err, conf.errors, entries) {
         unsigned int p = rand_range(MIN_PROBABLITY, MAX_PROBABLITY);
         if (!(p <= err->probability)) {
-            fprintf(stderr, "errinj '%s' skipped: probability (%d) is not matched\n",
-                            errinj_name[err->type], err->probability);
+            fprintf(stderr, "p value (%d) errinj '%s' skipped: probability (%d) is not matched\n",
+                            p, errinj_name[err->type], err->probability);
             continue;
         }
         const char* op_name = fuse_op_name[operation];
