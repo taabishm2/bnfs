@@ -82,6 +82,9 @@ class FileServerServiceImpl final : public FileServer::Service
         if (res != 0)
         {
             baseResponse.set_errorcode(-errno);
+            cout << "SERVER [NOT FOUND]" << endl;
+        } else {
+            cout << "SERVER [FOUND]" << endl;
         }
 
         reply->set_dev(stbuf.st_dev);
@@ -100,7 +103,6 @@ class FileServerServiceImpl final : public FileServer::Service
 
         reply->mutable_baseresponse()->CopyFrom(baseResponse);
 
-        cout << "SERVER [SUCCESS]" << endl;
         return Status::OK;
     }
 

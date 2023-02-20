@@ -393,14 +393,14 @@ int unreliable_release(const char *path, struct fuse_file_info *fi)
         return ret;
     }
 
-    // Flush changes from local file to afs.
-	ret = AFS_flush(afsClient, path);
-
     // Close local cache file descriptor.
     ret = close(fi->fh);
     if (ret == -1) {
         return -errno;
     }
+
+    // Flush changes from local file to afs.
+	ret = AFS_flush(afsClient, path, fi);
 
     return 0;
 }

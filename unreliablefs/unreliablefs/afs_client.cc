@@ -234,8 +234,8 @@ extern "C"
     int Open(const char *path, struct fuse_file_info *fi, bool is_create)
     {
       // We don't allow opening of dirty files. (to prevent read after write conflicts).
-      if (cache_helper->isFileDirty(path))
-        return -EIO;
+      // if (cache_helper->isFileDirty(path))
+      //   return -EIO;
 
       int o_fl = getOpenFlags(is_create, fi -> flags, path);
       cout << "[log] Open Flags: " << o_fl << endl;
@@ -379,7 +379,7 @@ extern "C"
     return 0;
   }
 
-  int Flush(const char *path)
+  int Flush(const char *path, struct fuse_file_info *fi)
    {
       // Get temp file path to close.
       string temp_path = cache_helper->getTempPath(path);
@@ -395,6 +395,9 @@ extern "C"
         cout << "File isn't dirty: " << path << endl;
         return 0;
       }
+
+      //
+      fsync(fi->fh);
 
       cout << "CLIENT: Put File " << temp_path << " for " << path << " to server\n";
 
@@ -467,9 +470,9 @@ extern "C"
     return client->Open(file_path, fi, is_create);
   }
 
-  int AFS_flush(AFSClient *client, const char *file_path)
+  int AFS_flush(AFSClient *client, const char *file_path, struct fuse_file_info *fi)
   {
-    return client->Flush(file_path);
+    return client->Flush(file_path, fi);
   }
 
   int AFS_getAttr(AFSClient *client, const char *file_path, struct stat *buf)
