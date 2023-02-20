@@ -262,11 +262,11 @@ extern "C"
 
       else if (requiresNewCacheAndTemp (o_fl))
       {
-        // mark file as dirty.
-        cache_helper -> markFileDirty(path);
-
         cache_helper->syncFileToCache(path, "", false, fi->flags);
         temp_fd = cache_helper->syncFileToTemp(path, "", false, fi->flags);
+
+        // mark file as dirty.
+        cache_helper -> markFileDirty(path);
       }
 
       else if (requiresNoChange (o_fl))
@@ -369,8 +369,27 @@ extern "C"
         return -1;
       }
 
-      // flush old path changes.
-      cache_helper -> deleteFromTemp(old_path);
+      // rename cache files as well.
+      int ret = rename(
+        cache_helper-> getCachePath(old_path).c_str(),
+        cache_helper-> getCachePath(new_path).c_str());
+        if (ret == -1) {
+            cout << "renaming cache failed " << errno << endl;
+            return -errno;
+        }
+      cout << "renamed " << cache_helper-> getCachePath(old_path) << " " <<
+        cache_helper-> getCachePath(new_path) << endl;
+
+      ret = rename(
+        cache_helper-> getTempPath(old_path).c_str(),
+        cache_helper-> getTempPath(new_path).c_str());
+        if (ret == -1) {
+            cout << "renaming temp failed " << errno << endl;
+            return -errno;
+        }
+      cout << "renamed " << cache_helper-> getTempPath(old_path) << " " <<
+        cache_helper-> getTempPath(new_path) << endl;
+      
 
     return 0;
   }
@@ -506,7 +525,7 @@ extern "C"
   }
 
   char* Cache_path(AFSClient* client, const char *path) {
-    string cache_path = client -> cache_helper -> getCachePath(path);
+    string cache_path = client -> cache_helper -> getTempPath(path);
     cout << "cache path for " << path << " is " << cache_path << endl; 
 
     char* res = (char*) malloc(sizeof(char) * cache_path.length());

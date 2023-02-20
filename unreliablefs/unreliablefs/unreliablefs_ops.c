@@ -84,8 +84,9 @@ int unreliable_lstat(const char *path, struct stat *buf)
         return ret;
     }
 
+    const char* cache_path = Cache_path(afsClient, path);
     memset(buf, 0, sizeof(struct stat));
-    if (lstat(path, buf) == -1) {
+    if (lstat(cache_path, buf) == -1) {
         return -errno;
     }
 
@@ -119,7 +120,9 @@ int unreliable_mknod(const char *path, mode_t mode, dev_t dev)
         return ret;
     }
 
-    ret = mknod(path, mode, dev);    
+    printf("mknod being called \n");
+    const char* cache_path = Cache_path(afsClient, path);
+    ret = mknod(cache_path, mode, dev);    
     if (ret == -1) {
         return -errno;
     }
@@ -205,7 +208,8 @@ int unreliable_chmod(const char *path, mode_t mode)
         return ret;
     }
     
-    ret = chmod(path, mode);
+    const char* cache_path = Cache_path(afsClient, path);
+    ret = chmod(cache_path, mode);
     if (ret < 0) {
         return -errno;
     }
@@ -222,7 +226,8 @@ int unreliable_chown(const char *path, uid_t owner, gid_t group)
         return ret;
     }
 
-    ret = chown(path, owner, group);
+    const char* cache_path = Cache_path(afsClient, path);
+    ret = chown(cache_path, owner, group);
     if (ret == -1) {
         return -errno;
     }
@@ -324,6 +329,8 @@ int unreliable_write(const char *path, const char *buf, size_t size,
 	fd = fi->fh;
     }
 
+    printf("am writing %lu bytes to path %s\n", size, path);
+
     if (fd == -1) {
 	return -errno;
     }
@@ -351,7 +358,8 @@ int unreliable_statfs(const char *path, struct statvfs *buf)
         return ret;
     }
 
-    ret = statvfs(path, buf);
+    const char* cache_path = Cache_path(afsClient, path);
+    ret = statvfs(cache_path, buf);
     if (ret == -1) {
         return -errno;
     }
@@ -368,6 +376,7 @@ int unreliable_flush(const char *path, struct fuse_file_info *fi)
         return ret;
     }
 
+    printf("flushing fd %lu\n", fi-> fh);
     ret = close(dup(fi->fh));
     if (ret == -1) {
         return -errno;
@@ -432,10 +441,13 @@ int unreliable_setxattr(const char *path, const char *name,
         return ret;
     }
 
+ const char* cache_path = Cache_path(afsClient, path);
+ printf("setxattr being called\n");
+
 #ifdef __APPLE__
-    ret = setxattr(path, name, value, size, 0, flags);
+    ret = setxattr(cache_path, name, value, size, 0, flags);
 #else
-    ret = setxattr(path, name, value, size, flags);
+    ret = setxattr(cache_path, name, value, size, flags);
 #endif /* __APPLE__ */
     if (ret == -1) {
         return -errno;
@@ -454,14 +466,16 @@ int unreliable_getxattr(const char *path, const char *name,
         return ret;
     }
 
-// #ifdef __APPLE__
-//     ret = getxattr(path, name, value, size, 0, XATTR_NOFOLLOW);
-// #else
-//     ret = getxattr(path, name, value, size);
-// #endif /* __APPLE__ */
-//     if (ret == -1) {
-//         return -errno;
-//     }
+    const char* cache_path = Cache_path(afsClient, path);
+
+    #ifdef __APPLE__
+        ret = getxattr(cache_path, name, value, size, 0, XATTR_NOFOLLOW);
+    #else
+        ret = getxattr(cache_path, name, value, size);
+    #endif /* __APPLE__ */
+        if (ret == -1) {
+            return -errno;
+        }
     
     return 0;
 }
@@ -475,10 +489,12 @@ int unreliable_listxattr(const char *path, char *list, size_t size)
         return ret;
     }
 
+ const char* cache_path = Cache_path(afsClient, path);
+
 #ifdef __APPLE__
-    ret = listxattr(path, list, size, XATTR_NOFOLLOW);
+    ret = listxattr(cache_path, list, size, XATTR_NOFOLLOW);
 #else
-    ret = listxattr(path, list, size);
+    ret = listxattr(cache_path, list, size);
 #endif /* __APPLE__ */
     if (ret == -1) {
         return -errno;
@@ -496,10 +512,12 @@ int unreliable_removexattr(const char *path, const char *name)
         return ret;
     }
 
+ const char* cache_path = Cache_path(afsClient, path);
+
 #ifdef __APPLE__
-    ret = removexattr(path, name, XATTR_NOFOLLOW);
+    ret = removexattr(cache_path, name, XATTR_NOFOLLOW);
 #else
-    ret = removexattr(path, name);
+    ret = removexattr(cache_path, name);
 #endif /* __APPLE__ */
     if (ret == -1) {
         return -errno;

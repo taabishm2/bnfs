@@ -199,13 +199,13 @@ int  CacheHelper::syncFileToCache(const char *path, const char *data, bool close
     }
 
     int file_descriptor = -1;
-    if (!close_file) {
-        cout << "opening file " << cache_path.c_str() << endl;
-        file_descriptor = open(cache_path.c_str(), open_mode);
-        if(file_descriptor < 0) {
-            printf ("open error no is : %d\n", errno);
-        }
-    }
+    // if (!close_file) {
+    //     cout << "opening file " << cache_path.c_str() << endl;
+    //     file_descriptor = open(cache_path.c_str(), open_mode);
+    //     if(file_descriptor < 0) {
+    //         printf ("open error no is : %d\n", errno);
+    //     }
+    // }
 
     return file_descriptor;
 }
