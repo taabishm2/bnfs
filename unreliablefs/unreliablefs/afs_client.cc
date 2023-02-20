@@ -220,12 +220,12 @@ extern "C"
         cout << "local file not present" << endl;
         return 1;
       }
+      close(fd);
 
       if(outOfDate) {
         cout << "file is out of date" << endl;
         return 1;
       }
-      close(fd);
 
       return 2;
     }
@@ -313,6 +313,7 @@ extern "C"
 
     int Unlink(const char* file_path) {
       // Remove file from cache and temp.
+      cache_helper -> deleteFromTemp(file_path);
 
       // Remove file from server.
 
@@ -336,6 +337,28 @@ extern "C"
   }
 
   int Rename(const char* old_path, const char* new_path) {
+      int fd = cache_helper -> isPresentInCache(old_path);
+      if(fd > 0) {
+        string old_cache_path = cache_helper-> getTempPath(old_path);
+        string new_cache_path = cache_helper-> getTempPath(new_path);
+        int ret = rename(
+          old_cache_path.c_str(), new_cache_path.c_str());
+          if (ret == -1) {
+              cout << "renaming temp failed " <<
+              " old path " << old_cache_path << 
+              " new path " << new_cache_path << errno << endl;
+              return -errno;
+          }
+        cout << "renamed " << old_cache_path << " " << new_cache_path << endl;
+
+        if(cache_helper->isFileDirty(old_path)) {
+          cache_helper -> unmarkFileDirty(old_path);
+          cache_helper -> markFileDirty(new_path);
+        }
+
+        close(fd);
+      }
+
       // Prepare grpc messages.
       ClientContext context;
       RenameReq request;
@@ -351,32 +374,6 @@ extern "C"
         cout << "rename rpc failed" << endl;
 
         return -1;
-      }
-
-      // rename cache files as well.
-      // int ret = rename(
-      //   cache_helper-> getCachePath(old_path).c_str(),
-      //   cache_helper-> getCachePath(new_path).c_str());
-      //   if (ret == -1) {
-      //       cout << "renaming cache failed " << errno << endl;
-      //       return -errno;
-      //   }
-      // cout << "renamed " << cache_helper-> getCachePath(old_path) << " " <<
-      //   cache_helper-> getCachePath(new_path) << endl;
-      const char* old_cache_path = cache_helper-> getTempPath(old_path).c_str();
-      const char* new_cache_path = cache_helper-> getTempPath(new_path).c_str();
-      int ret = rename(
-        old_cache_path, new_cache_path);
-        if (ret == -1) {
-            cout << "renaming temp failed " << errno << endl;
-            return -errno;
-        }
-      cout << "renamed " << cache_helper-> getTempPath(old_path) << " " <<
-        cache_helper-> getTempPath(new_path) << endl;
-
-      if(cache_helper->isFileDirty(old_path)) {
-        cache_helper -> unmarkFileDirty(old_path);
-        cache_helper -> markFileDirty(new_path);
       }
 
     return 0;
