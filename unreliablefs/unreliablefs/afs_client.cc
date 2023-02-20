@@ -53,6 +53,8 @@ using afs::SimplePathRequest;
 using afs::StatResponse;
 using afs::UnlinkReq;
 using afs::UnlinkResp;
+using afs::RenameReq;
+using afs::RenameResp;
 
 using grpc::Channel;
 using grpc::ClientContext;
@@ -326,25 +328,49 @@ extern "C"
     }
 
     int Unlink(const char* file_path) {
-    // Remove file from cache and temp.
+      // Remove file from cache and temp.
 
-    // Remove file from server.
+      // Remove file from server.
 
-    // Prepare grpc messages.
-    ClientContext context;
-    UnlinkReq request;
-    UnlinkResp reply;
+      // Prepare grpc messages.
+      ClientContext context;
+      UnlinkReq request;
+      UnlinkResp reply;
 
-    request.set_path(file_path);
+      request.set_path(file_path);
 
-    Status status = stub_->Unlink(&context, request, &reply);
-    
-    if (!status.ok())
-		{
-      cout << "unlink rpc failed" << endl;
+      Status status = stub_->Unlink(&context, request, &reply);
+      
+      if (!status.ok())
+      {
+        cout << "unlink rpc failed" << endl;
 
-      return -1;
-    }
+        return -1;
+      }
+
+      return 0;
+  }
+
+  int Rename(const char* old_path, const char* new_path) {
+      // Prepare grpc messages.
+      ClientContext context;
+      RenameReq request;
+      RenameResp reply;
+
+      request.set_old_path(old_path);
+      request.set_new_path(new_path);
+
+      Status status = stub_->Rename(&context, request, &reply);
+      
+      if (!status.ok())
+      {
+        cout << "rename rpc failed" << endl;
+
+        return -1;
+      }
+
+      // flush old path changes.
+      cache_helper -> deleteFromTemp(old_path);
 
     return 0;
   }
@@ -366,7 +392,7 @@ extern "C"
         return 0;
       }
 
-      cout << "CLIENT: Put File " << temp_path << " to server\n";
+      cout << "CLIENT: Put File " << temp_path << " for " << path << " to server\n";
 
       ClientContext context;
       PutFileReq request;
@@ -469,6 +495,10 @@ extern "C"
 
   int AFS_unlink(AFSClient* client, const char* file_path) {
     return client -> Unlink(file_path);
+  }
+
+  int AFS_rename(AFSClient* client, const char* old_path, const char* new_path) {
+    return client -> Rename(old_path, new_path);
   }
 
   void Cache_markFileDirty(AFSClient* client, const char *path) {

@@ -33,6 +33,8 @@ int AFS_access(AFSClient* client, const char* file_path, int mode);
 
 int AFS_unlink(AFSClient* client, const char* file_path);
 
+int AFS_rename(AFSClient* client, const char* old_path, const char * new_path);
+
 // void Cache_initCache(CacheHelper* helper);
 
 // bool Cache_getCheckInCache(CacheHelper *helper, const char *path, int *file_descriptor, bool close_file, int open_mode);

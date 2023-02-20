@@ -31,6 +31,8 @@ using afs::ReadDirResponse;
 using afs::AccessPathRequest;
 using afs::SimplePathRequest;
 using afs::StatResponse;
+using afs::RenameReq;
+using afs::RenameResp;
 
 using grpc::Server;
 using grpc::ServerBuilder;
@@ -288,6 +290,22 @@ class FileServerServiceImpl final : public FileServer::Service
         return Status::OK;
     }
 
+    Status Rename(ServerContext *context, const RenameReq *request,
+                  RenameResp *reply) override
+    {
+        string old_path = getServerPath(request -> old_path());
+        string new_path = getServerPath(request -> new_path());
+        cout << "SERVER Rename op called for " << old_path << " to " << new_path << endl;
+
+        int ret = rename(old_path.c_str(), new_path.c_str());
+        if (ret == -1) {
+            cout << "SERVER [FAILED] errno " << errno << endl;
+            return Status::CANCELLED;
+        }
+
+        cout << "SERVER [SUCCESS]" << endl;
+        return Status::OK;
+    }
 };
 
 void RunServer()

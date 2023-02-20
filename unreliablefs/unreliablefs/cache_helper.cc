@@ -186,7 +186,7 @@ int  CacheHelper::syncFileToCache(const char *path, const char *data, bool close
     ofstream file(cache_path, ios::out);
     if (!file || !file.is_open())
     {
-        cerr << "Failed to sync cache file: " << path << endl;
+        cerr << "Failed to sync cache file: " << path << " errno " << errno << endl;
         return -1;
     }
 

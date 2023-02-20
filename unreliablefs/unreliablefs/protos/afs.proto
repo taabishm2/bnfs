@@ -24,6 +24,8 @@ service FileServer {
   rpc PutFile(stream PutFileReq) returns (PutFileResp) {} 
 
   rpc Unlink(UnlinkReq) returns (UnlinkResp) {}
+
+  rpc Rename(RenameReq) returns (RenameResp) {}
 }
 
 message OpenReq {
@@ -103,4 +105,13 @@ message BaseResponse {
 }
 
 message Empty {
+}
+
+message RenameReq {
+  string old_path = 1;
+  string new_path = 2;
+}
+
+message RenameResp {
+  int32  err = 1;
 }

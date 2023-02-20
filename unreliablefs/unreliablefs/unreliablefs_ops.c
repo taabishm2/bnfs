@@ -171,9 +171,9 @@ int unreliable_rename(const char *oldpath, const char *newpath)
         return ret;
     }
 
-    ret = rename(oldpath, newpath);
-    if (ret == -1) {
-        return -errno;
+    ret = AFS_rename(afsClient, oldpath, newpath);
+    if (ret < 0) {
+        return -ret;
     }
 
     return 0;
@@ -190,7 +190,7 @@ int unreliable_link(const char *oldpath, const char *newpath)
 
     ret = link(oldpath, newpath);
     if (ret < 0) {
-        return -errno;
+        return ret;
     }
 
     return 0;
@@ -278,8 +278,6 @@ int unreliable_read(const char *path, char *buf, size_t size, off_t offset,
         return ret;
     }
 
-    printf("NOT IMPLEMENTED UNREL FS READ with path=== %s ", path);
-
     int fd;
     if (fi == NULL) {
         printf("hi1 I'M NUL :(((((())))))");
@@ -294,7 +292,7 @@ int unreliable_read(const char *path, char *buf, size_t size, off_t offset,
     }
 
     ret = pread(fd, buf, size, offset);
-    printf("Contents in Buffer!====== %s", buf);
+    printf("Contents in Buffer!======\n%s\n", buf);
     if (ret == -1) {
         ret = -errno;
     }
