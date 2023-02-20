@@ -297,7 +297,6 @@ int unreliable_read(const char *path, char *buf, size_t size, off_t offset,
     }
 
     ret = pread(fd, buf, size, offset);
-    printf("Contents in Buffer!======\n%s\n", buf);
     if (ret == -1) {
         ret = -errno;
     }
@@ -376,7 +375,7 @@ int unreliable_flush(const char *path, struct fuse_file_info *fi)
         return ret;
     }
 
-    printf("flushing fd %lu\n", fi-> fh);
+    printf("flushing fd %lu for %s\n", fi-> fh, path);
     ret = close(dup(fi->fh));
     if (ret == -1) {
         return -errno;

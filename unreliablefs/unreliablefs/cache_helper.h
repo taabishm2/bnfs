@@ -51,6 +51,12 @@ struct CacheHelper
     /* Returns file descriptor of temp file */
     int syncFileToTemp(const char *path, const char *data, bool close_file, int open_mode);
 
+    int writeFileToCache(const char *path, const char *data);
+
+    int isPresentInCache(const char *path);
+
+    bool isOutOfDate(const char *path, int server_modified_at_epoch, int file_descriptor);
+
     bool setFileModifiedTime(const char *path, int epoch_time);
 
     /* Returns status: 0 is success, else failure */
@@ -63,6 +69,8 @@ struct CacheHelper
     bool isFileDirty(const char *path);
 
     void markFileDirty(const char *path);
+
+    void unmarkFileDirty(const char *path);
 
     void deleteFromTemp(const char *path);
 
