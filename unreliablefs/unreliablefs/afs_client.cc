@@ -456,7 +456,8 @@ extern "C"
             buf.resize(file.gcount());
             request.set_contents(buf);
             writer->Write(request);
-      }
+        }
+      
       writer->WritesDone();
       Status status = writer->Finish();
 
