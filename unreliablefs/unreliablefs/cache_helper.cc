@@ -183,13 +183,14 @@ int  CacheHelper::syncFileToCache(const char *path, const char *data, bool close
 {
     string cache_path = getCachePath(path);
 
-    ofstream file(cache_path, ios::out);
+    ofstream file(cache_path, ios::trunc);
     if (!file || !file.is_open())
     {
         cerr << "Failed to sync cache file: " << path << " errno " << errno << endl;
         return -1;
     }
 
+    cout  << "===========" << data << " with lenght   =====  " << strlen(data) << "\n";
     file.write(data, strlen(data));
     file.close();
 
@@ -199,13 +200,16 @@ int  CacheHelper::syncFileToCache(const char *path, const char *data, bool close
     }
 
     int file_descriptor = -1;
-    // if (!close_file) {
-    //     cout << "opening file " << cache_path.c_str() << endl;
-    //     file_descriptor = open(cache_path.c_str(), open_mode);
-    //     if(file_descriptor < 0) {
-    //         printf ("open error no is : %d\n", errno);
-    //     }
-    // }
+    if (!close_file) {
+        cout << "opening file " << cache_path.c_str() << endl;
+        file_descriptor = open(cache_path.c_str(), open_mode);
+        char buf[100];
+        pread(file_descriptor, buf, 100, 0);
+        cout << "BUFF IS ====== " << buf <<"\n";
+        if(file_descriptor < 0) {
+            printf ("open error no is : %d\n", errno);
+        }
+    }
 
     return file_descriptor;
 }

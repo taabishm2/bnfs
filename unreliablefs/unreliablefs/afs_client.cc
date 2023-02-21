@@ -427,7 +427,7 @@ extern "C"
         return -1;
       }
 
-      while (!file.eof())
+      while (file.read(&buf[0], BUFSIZE))
       {
         file.read(&buf[0], BUFSIZE);
         request.set_contents(buf);
@@ -438,6 +438,12 @@ extern "C"
           break;
         }
       }
+      if (file.eof()) {
+            buf.resize(file.gcount());
+            request.set_contents(buf);
+            writer->Write(request);
+        }
+      
       writer->WritesDone();
       Status status = writer->Finish();
 
