@@ -195,7 +195,7 @@ class FileServerServiceImpl final : public FileServer::Service
             }
             writer->Write(reply);
 
-            cout << "SERVER [SUCCESS]" << endl;
+            cout << "SERVER [SUCCESS], created new file " << path << endl;
             return Status::OK;
         }
         cout << "File exists\n";

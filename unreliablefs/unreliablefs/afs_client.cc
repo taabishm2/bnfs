@@ -254,6 +254,8 @@ extern "C"
 
         // mark file as dirty.
         cache_helper -> markFileDirty(path);
+
+        createOnServer(path, fi);
       }
 
       int flags = fi -> flags;
@@ -276,6 +278,34 @@ extern "C"
       cache_helper -> deleteFromTemp(path);
 
       return -errno;
+    }
+
+    int createOnServer(const char *path, struct fuse_file_info *fi)
+    {
+      OpenReq request;
+      ClientContext open_context;
+      request.set_path(path);
+      request.set_flag(fi->flags);
+      request.set_is_create(true);
+
+
+      OpenResp reply;
+      unique_ptr<grpc::ClientReader<OpenResp>> reader(stub_->Open(&open_context, request));
+
+      if (!reader->Read(&reply))
+      {
+        cout << "[err] Open: failed to download file: " << path << endl;
+        return -EIO;
+      }
+
+      Status status = reader->Finish();
+      if (!status.ok())
+      {
+        cout << "[err] Open: failed to download from server. \n";
+        return -EIO;
+      }
+
+      return 0;
     }
 
     int fetchAndSyncServerFile(const char *path, struct fuse_file_info *fi)
@@ -418,7 +448,7 @@ extern "C"
 
         if (!writer->Write(request))
         {
-          cache_helper->deleteFromTemp(path);
+          //cache_helper->deleteFromTemp(path);
           break;
         }
       }
@@ -435,7 +465,7 @@ extern "C"
       if (!status.ok())
       {
         cout << "CLIENT: PutFile rpc failed: " << status.error_message() << endl;
-        cache_helper->deleteFromTemp(path);
+        //cache_helper->deleteFromTemp(path);
         return -1;
       }
       else

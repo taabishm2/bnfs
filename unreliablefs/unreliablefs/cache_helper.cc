@@ -292,8 +292,10 @@ int CacheHelper::commitToCache(const char *path, int server_modified_at_epoch)
     // string cache_path = getCachePath(path);
 
     int temp_file_fd = open(temp_path.c_str(), O_RDWR);
-    if (temp_file_fd == -1)
-        return 1;
+    if (temp_file_fd < 0) {
+        cout << "temp file not found " << temp_path << endl;
+        return -errno;
+    }
     close(temp_file_fd);
 
     // string cp_command = "cp -f " + temp_path + " " + cache_path;
