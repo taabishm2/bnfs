@@ -412,9 +412,8 @@ extern "C"
         return -1;
       }
 
-      while (!file.eof())
+      while (file.read(&buf[0], BUFSIZE))
       {
-        file.read(&buf[0], BUFSIZE);
         request.set_contents(buf);
 
         if (!writer->Write(request))
@@ -422,6 +421,11 @@ extern "C"
           cache_helper->deleteFromTemp(path);
           break;
         }
+      }
+      if (file.eof()) {
+            buf.resize(file.gcount());
+            request.set_contents(buf);
+            writer->Write(request);
       }
       writer->WritesDone();
       Status status = writer->Finish();

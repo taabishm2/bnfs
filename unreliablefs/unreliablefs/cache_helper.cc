@@ -260,7 +260,7 @@ int  CacheHelper::syncFileToTemp(const char *path, const char *data, bool close_
 int CacheHelper::writeFileToCache(const char* path, const char* data) {
     string temp_path = getTempPath(path);
 
-    ofstream file(temp_path, ios::out);
+    ofstream file(temp_path, std::ios::binary | std::ios::out | std::ios::trunc);
     if (!file || !file.is_open())
     {
         cerr << "Failed to sync temp file: " << path << endl;

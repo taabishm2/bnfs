@@ -202,7 +202,7 @@ class FileServerServiceImpl final : public FileServer::Service
         reply.set_file_exists(true);
 
         string buf(BUFSIZE, '\0');
-         cout << "Reading";
+         cout << "Reading" << endl;
         while (file.read(&buf[0], BUFSIZE))
         {
             reply.set_buf(buf);
@@ -238,7 +238,7 @@ class FileServerServiceImpl final : public FileServer::Service
 
             // open file using append mode.
             // This should create a file if not exists.
-            outfile.open(temp_file_path, ios::out | ios::app);
+            outfile.open(temp_file_path, ios::out | ios::trunc);
         }
         cout << "Server PutFile " << file_path << endl;
 
