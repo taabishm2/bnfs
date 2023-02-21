@@ -10,6 +10,7 @@ This is ClientB.
 
 
 def run_test():
+    printf("===============================YAYAYAYAYYYYYY======")
     signal_name_gen = fs_util.get_fs_signal_name()
 
     cur_signal_name = next(signal_name_gen)

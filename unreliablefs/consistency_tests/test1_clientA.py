@@ -9,7 +9,7 @@ This is ClientA.
 '''
 
 cs739_env_vars = [
-    'CS739_CLIENT_A', 'CS739_CLIENT_B', 'CS739_SERVER', 'CS739_MOUNT_POINT'
+    'CS739_CLIENT_A', 'CS739_CLIENT_A_PORT', 'CS739_CLIENT_B', 'CS739_CLIENT_B_PORT', 'CS739_SERVER', 'CS739_MOUNT_POINT'
 ]
 ENV_VARS = {var_name: os.environ.get(var_name) for var_name in cs739_env_vars}
 for env_var in ENV_VARS.items():
@@ -23,8 +23,11 @@ TEST_CASE_NO = 1
 
 def run_test():
     host_b = ENV_VARS['CS739_CLIENT_B']
-    assert fs_util.test_ssh_access(host_b)
+    port_b = ENV_VARS['CS739_CLIENT_B_PORT']
+    assert fs_util.test_ssh_access(host_b, port_b)
     signal_name_gen = fs_util.get_fs_signal_name()
+    host_b = "-p " + port_b + " "+  host_b
+    print(host_b)
 
     if not fs_util.path_exists(TEST_DATA_DIR):
         fs_util.mkdir(TEST_DATA_DIR)
@@ -42,7 +45,10 @@ def run_test():
 
     # time for client_b to work, host_b should read the all-zero file
     cur_signal_name = next(signal_name_gen)
+    print("===============STARTING CLIENT B=====", cur_signal_name)
     fs_util.start_another_client(host_b, 1, 'B', cur_signal_name)
+    # fs_util.start_another_client(host_b, 1, 'B', "python3 /tmp/test1_clientB.py")
+    print("===============STARTed CLIENT B=====")
 
     # wait until client_b finish
     while True:
