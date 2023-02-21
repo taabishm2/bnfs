@@ -233,7 +233,8 @@ class FileServerServiceImpl final : public FileServer::Service
         if(reader->Read(&request)) {
             file_path = request.path();
             cache_path = getServerPath(file_path);
-            temp_file_path = cache_path +  random_string(20);
+            // temp_file_path = cache_path +  random_string(20);
+            temp_file_path = cache_path;
 
             // open file using append mode.
             // This should create a file if not exists.
@@ -248,13 +249,13 @@ class FileServerServiceImpl final : public FileServer::Service
         outfile.close();
 
         // Rename temp_file_path to file_path.
-        string cp_command = "mv -f " + temp_file_path + " " + cache_path;
-        int status = system(cp_command.c_str());
-        if (status == -1) {
-            cout << "mv system call " << cp_command << " failed\n";
-            cout << "SERVER [FAILED]" << endl;
-            return Status::CANCELLED;
-        }
+        // string cp_command = "mv -f " + temp_file_path + " " + cache_path;
+        // int status = system(cp_command.c_str());
+        // if (status == -1) {
+        //     cout << "mv system call " << cp_command << " failed\n";
+        //     cout << "SERVER [FAILED]" << endl;
+        //     return Status::CANCELLED;
+        // }
 
         // // Set file server modification time.
         struct stat stbuf;

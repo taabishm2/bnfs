@@ -396,9 +396,6 @@ extern "C"
         return 0;
       }
 
-      //
-      fsync(fi->fh);
-
       cout << "CLIENT: Put File " << temp_path << " for " << path << " to server\n";
 
       ClientContext context;
