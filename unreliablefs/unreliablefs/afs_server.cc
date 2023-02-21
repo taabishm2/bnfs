@@ -13,6 +13,7 @@
 
 #include <sys/stat.h>
 #include <dirent.h>
+#include <pthread.h>
 
 #include <openssl/sha.h>
 
@@ -71,6 +72,11 @@ string random_string(const int len) {
 
 class FileServerServiceImpl final : public FileServer::Service
 {
+    public:
+    explicit FileServerServiceImpl() {
+        pthread_mutex_init(&lock, NULL);
+    }
+
     Status GetAttr(ServerContext *context, const SimplePathRequest *request,
                    StatResponse *reply) override
     {
@@ -235,18 +241,19 @@ class FileServerServiceImpl final : public FileServer::Service
             cache_path = getServerPath(file_path);
             // temp_file_path = cache_path +  random_string(20);
             temp_file_path = cache_path;
-
-            // open file using append mode.
-            // This should create a file if not exists.
-            outfile.open(temp_file_path, ios::out | ios::trunc);
         }
         cout << "Server PutFile " << file_path << endl;
 
+        // pthread_mutex_lock(&lock);
+        // open file using trunc mode.
+        // This should create a file if not exists.
+        outfile.open(temp_file_path, ios::out | ios::trunc);
         while (reader->Read(&request)) {
             // write contents.
             outfile << request.contents();
         }
         outfile.close();
+        // pthread_mutex_unlock(&lock);
 
         // Rename temp_file_path to file_path.
         // string cp_command = "mv -f " + temp_file_path + " " + cache_path;
@@ -309,6 +316,8 @@ class FileServerServiceImpl final : public FileServer::Service
         cout << "SERVER [SUCCESS]" << endl;
         return Status::OK;
     }
+
+    pthread_mutex_t lock;
 };
 
 void RunServer()
