@@ -210,17 +210,25 @@ extern "C"
 
       int server_time = static_cast<int>(static_cast<time_t>(getAttrData.st_atim.tv_sec));
 
-      int fd = cache_helper->isPresentInCache(path);
+      int cache_fd = cache_helper->isPresentInCache(path);
+      int temp_fd = cache_helper->isPresentInTemp(path);
+
       bool outOfDate = true;
-      if(fd > 0) {
-        outOfDate = cache_helper->isOutOfDate(path, server_time, fd);
+      if(temp_fd > 0) {
+        outOfDate = cache_helper->isOutOfDate(path, server_time, temp_fd);
       }
 
-      if(fd < 0) {
-        cout << "local file not present" << endl;
+      if(temp_fd < 0 && cache_fd < 0) {
+        cout << "Local temp/cache not present" << endl;
         return 1;
       }
-      close(fd);
+
+      if(temp_fd < 0 && cache_fd >= 0 && !outOfDate) {
+        cout << "Fresh cache present, temp absent" << endl;
+        return 4;
+      }
+
+      close(temp_fd);
 
       if(outOfDate) {
         cout << "file is out of date" << endl;
@@ -237,10 +245,11 @@ extern "C"
       // if (cache_helper->isFileDirty(path))
       //   return -EIO;
 
+      int fd;
       int o_fl = getOpenFlags(is_create, fi -> flags, path);
       cout << "[log] Open Flags: " << o_fl << endl;
 
-      if (o_fl == 1)
+      if (o_fl == 1) // File out of date
         fetchAndSyncServerFile(path, fi);
 
       else if (o_fl == 2)
@@ -251,9 +260,16 @@ extern "C"
       {
         // cache_helper->writeFileToCache(path, "");
         close(creat(cache_helper -> getTempPath(path).c_str(), 00777));
+        close(creat(cache_helper -> getCachePath(path).c_str(), 00777));
 
         // mark file as dirty.
         cache_helper -> markFileDirty(path);
+
+        createOnServer(path, fi);
+      }
+
+      else if (o_fl == 4) {
+        cache_helper->getCheckInTemp(path, &fd, true, O_RDONLY, true);
       }
 
       int flags = fi -> flags;
@@ -276,6 +292,34 @@ extern "C"
       cache_helper -> deleteFromTemp(path);
 
       return -errno;
+    }
+
+    int createOnServer(const char *path, struct fuse_file_info *fi)
+    {
+      OpenReq request;
+      ClientContext open_context;
+      request.set_path(path);
+      request.set_flag(fi->flags);
+      request.set_is_create(true);
+
+
+      OpenResp reply;
+      unique_ptr<grpc::ClientReader<OpenResp>> reader(stub_->Open(&open_context, request));
+
+      if (!reader->Read(&reply))
+      {
+        cout << "[err] Open: failed to download file: " << path << endl;
+        return -EIO;
+      }
+
+      Status status = reader->Finish();
+      if (!status.ok())
+      {
+        cout << "[err] Open: failed to download from server. \n";
+        return -EIO;
+      }
+
+      return 0;
     }
 
     int fetchAndSyncServerFile(const char *path, struct fuse_file_info *fi)
@@ -307,6 +351,7 @@ extern "C"
       }
 
       cache_helper->writeFileToCache(path, buf.c_str());
+      cache_helper->writeFileToTemp(path, buf.c_str());
 
       return 0;
     }
@@ -396,9 +441,6 @@ extern "C"
         return 0;
       }
 
-      //
-      fsync(fi->fh);
-
       cout << "CLIENT: Put File " << temp_path << " for " << path << " to server\n";
 
       ClientContext context;
@@ -415,17 +457,22 @@ extern "C"
         return -1;
       }
 
-      while (!file.eof())
+      while (file.read(&buf[0], BUFSIZE))
       {
-        file.read(&buf[0], BUFSIZE);
         request.set_contents(buf);
 
         if (!writer->Write(request))
         {
-          cache_helper->deleteFromTemp(path);
+          //cache_helper->deleteFromTemp(path);
           break;
         }
       }
+      if (file.eof()) {
+            buf.resize(file.gcount());
+            request.set_contents(buf);
+            writer->Write(request);
+        }
+      
       writer->WritesDone();
       Status status = writer->Finish();
 
@@ -434,7 +481,7 @@ extern "C"
       if (!status.ok())
       {
         cout << "CLIENT: PutFile rpc failed: " << status.error_message() << endl;
-        cache_helper->deleteFromTemp(path);
+        //cache_helper->deleteFromTemp(path);
         return -1;
       }
       else

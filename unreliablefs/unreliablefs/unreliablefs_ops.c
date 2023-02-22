@@ -209,8 +209,10 @@ int unreliable_chmod(const char *path, mode_t mode)
     }
     
     const char* cache_path = Cache_path(afsClient, path);
+    printf("chmod is being called for %s %s\n", path, cache_path);
     ret = chmod(cache_path, mode);
     if (ret < 0) {
+        printf("chmod failed\n");
         return -errno;
     }
 
