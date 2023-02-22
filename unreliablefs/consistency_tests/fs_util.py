@@ -179,7 +179,7 @@ def mkdir(dir_name: str):
 
 def delete_file(fname: str):
     ret = os.unlink(fname)
-    assert ret == 0
+    #assert ret == 0
 
 
 def stat_file(fname: str) -> os.stat_result:
