@@ -75,8 +75,10 @@ struct CacheHelper
     void deleteFromTemp(const char *path);
 
     void printDirtyFiles(const char *path);
-};
 
-static std::unordered_set<string> dirty_files;
+    static std::unordered_set<string> dirty_files;
+
+    static pthread_mutex_t lock;
+};
 
 CacheHelper* NewCacheHelper();

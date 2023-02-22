@@ -24,6 +24,10 @@ using namespace std;
 
 static const string CLIENT_DIR_ROOT = "/users/chrahul5/bnfs_client";
 
+unordered_set<string> CacheHelper::dirty_files;
+
+pthread_mutex_t CacheHelper::lock = PTHREAD_MUTEX_INITIALIZER;
+
 CacheHelper::CacheHelper(void) {}
 
 string  CacheHelper::getCachePath(void)
@@ -314,7 +318,9 @@ int CacheHelper::commitToCache(const char *path, int server_modified_at_epoch)
     CacheHelper::setFileModifiedTime(temp_path.c_str(), server_modified_at_epoch);
     // CacheHelper::setFileModifiedTime(cache_path.c_str(), server_modified_at_epoch);
 
+    pthread_mutex_lock(&lock);
     dirty_files.erase(getHashedPath(path));
+    pthread_mutex_unlock(&lock);
 
     return 0;
 }
@@ -330,13 +336,22 @@ void CacheHelper::initCache()
 
 bool CacheHelper::isFileDirty(const char *path)
 {
-    return dirty_files.find(getHashedPath(path)) != dirty_files.end();
+    bool isDirty = false;
+    
+    pthread_mutex_lock(&lock);
+    isDirty = (dirty_files.find(getHashedPath(path)) != dirty_files.end());
+    pthread_mutex_unlock(&lock);
+    
+    return isDirty;
 }
 
 void CacheHelper::markFileDirty(const char *path)
 {
     cout << "setting path dirty " << path << endl;
+    
+    pthread_mutex_lock(&lock);
     dirty_files.insert(getHashedPath(path));
+    pthread_mutex_unlock(&lock);
 }
 
 void CacheHelper::unmarkFileDirty(const char *path)
@@ -348,7 +363,10 @@ void CacheHelper::unmarkFileDirty(const char *path)
 // TODO (rahul): add try-catch block to make it fail safely.
 void CacheHelper::deleteFromTemp(const char *path) {
     std::remove(getTempPath(path).c_str());
+
+    pthread_mutex_lock(&lock);
     dirty_files.erase(getHashedPath(path));
+    pthread_mutex_unlock(&lock);
 }
 
 CacheHelper* NewCacheHelper()

@@ -244,7 +244,7 @@ class FileServerServiceImpl final : public FileServer::Service
         }
         cout << "Server PutFile " << file_path << endl;
 
-        // pthread_mutex_lock(&lock);
+        pthread_mutex_lock(&lock);
         // open file using trunc mode.
         // This should create a file if not exists.
         outfile.open(temp_file_path, ios::out | ios::trunc);
@@ -253,7 +253,7 @@ class FileServerServiceImpl final : public FileServer::Service
             outfile << request.contents();
         }
         outfile.close();
-        // pthread_mutex_unlock(&lock);
+        pthread_mutex_unlock(&lock);
 
         // Rename temp_file_path to file_path.
         // string cp_command = "mv -f " + temp_file_path + " " + cache_path;
