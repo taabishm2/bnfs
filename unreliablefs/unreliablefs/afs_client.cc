@@ -208,7 +208,7 @@ extern "C"
         return 3;
       }
 
-      int server_time = static_cast<int>(static_cast<time_t>(getAttrData.st_atim.tv_sec));
+      int server_time = static_cast<int>(static_cast<time_t>(getAttrData.st_mtim.tv_sec));
 
       int cache_fd = cache_helper->isPresentInCache(path);
       int temp_fd = cache_helper->isPresentInTemp(path);
@@ -217,6 +217,7 @@ extern "C"
       if(temp_fd > 0) {
         outOfDate = cache_helper->isOutOfDate(path, server_time, temp_fd);
       }
+      cout << " [[CLIENT]] OUT OF DATE: " << outOfDate << endl; 
 
       if(temp_fd < 0 && cache_fd < 0) {
         cout << "Local temp/cache not present" << endl;
