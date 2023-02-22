@@ -113,9 +113,17 @@ bool  CacheHelper::getCheckInCache(const char *path, int *file_descriptor, bool 
     return false;
 }
 
-int CacheHelper::isPresentInCache(const char *path)
+int CacheHelper::isPresentInTemp(const char *path)
 {
     string cache_path = getTempPath(path);
+    int file_descriptor = open(cache_path.c_str(), O_RDONLY);
+
+    return file_descriptor;
+}
+
+int CacheHelper::isPresentInCache(const char *path)
+{
+    string cache_path = getCachePath(path);
     int file_descriptor = open(cache_path.c_str(), O_RDONLY);
 
     return file_descriptor;
@@ -262,6 +270,22 @@ int  CacheHelper::syncFileToTemp(const char *path, const char *data, bool close_
 }
 
 int CacheHelper::writeFileToCache(const char* path, const char* data) {
+    string cache_path = getCachePath(path);
+
+    ofstream file(cache_path, std::ios::binary | std::ios::out | std::ios::trunc);
+    if (!file || !file.is_open())
+    {
+        cerr << "Failed to sync cache file: " << path << endl;
+        return -1;
+    }
+
+    file.write(data, strlen(data));
+    file.close();
+
+    return 0;
+}
+
+int CacheHelper::writeFileToTemp(const char* path, const char* data) {
     string temp_path = getTempPath(path);
 
     ofstream file(temp_path, std::ios::binary | std::ios::out | std::ios::trunc);
@@ -293,7 +317,7 @@ bool  CacheHelper::setFileModifiedTime(const char *path, int epoch_time)
 int CacheHelper::commitToCache(const char *path, int server_modified_at_epoch)
 {
     string temp_path = getTempPath(path);
-    // string cache_path = getCachePath(path);
+    string cache_path = getCachePath(path);
 
     int temp_file_fd = open(temp_path.c_str(), O_RDWR);
     if (temp_file_fd < 0) {
@@ -302,21 +326,21 @@ int CacheHelper::commitToCache(const char *path, int server_modified_at_epoch)
     }
     close(temp_file_fd);
 
-    // string cp_command = "cp -f " + temp_path + " " + cache_path;
-    // int status = system(cp_command.c_str());
+    string cp_command = "cp -f " + temp_path + " " + cache_path;
+    int status = system(cp_command.c_str());
 
-    // if (status == -1)
-    //     return 1;
+    if (status == -1)
+        return 1;
 
-    // if (WIFEXITED(status))
-    // {
-    //     int exit_status = WEXITSTATUS(status);
-    //     if (exit_status != 0)
-    //         return 1;
-    // }
+    if (WIFEXITED(status))
+    {
+        int exit_status = WEXITSTATUS(status);
+        if (exit_status != 0)
+            return 1;
+    }
 
     CacheHelper::setFileModifiedTime(temp_path.c_str(), server_modified_at_epoch);
-    // CacheHelper::setFileModifiedTime(cache_path.c_str(), server_modified_at_epoch);
+    CacheHelper::setFileModifiedTime(cache_path.c_str(), server_modified_at_epoch);
 
     dirty_files.erase(getHashedPath(path));
 

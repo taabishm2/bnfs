@@ -210,17 +210,25 @@ extern "C"
 
       int server_time = static_cast<int>(static_cast<time_t>(getAttrData.st_atim.tv_sec));
 
-      int fd = cache_helper->isPresentInCache(path);
+      int cache_fd = cache_helper->isPresentInCache(path);
+      int temp_fd = cache_helper->isPresentInTemp(path);
+
       bool outOfDate = true;
-      if(fd > 0) {
-        outOfDate = cache_helper->isOutOfDate(path, server_time, fd);
+      if(temp_fd > 0) {
+        outOfDate = cache_helper->isOutOfDate(path, server_time, temp_fd);
       }
 
-      if(fd < 0) {
-        cout << "local file not present" << endl;
+      if(temp_fd < 0 && cache_fd < 0) {
+        cout << "Local temp/cache not present" << endl;
         return 1;
       }
-      close(fd);
+
+      if(temp_fd < 0 && cache_fd >= 0 && !outOfDate) {
+        cout << "Fresh cache present, temp absent" << endl;
+        return 4;
+      }
+
+      close(temp_fd);
 
       if(outOfDate) {
         cout << "file is out of date" << endl;
@@ -237,10 +245,11 @@ extern "C"
       // if (cache_helper->isFileDirty(path))
       //   return -EIO;
 
+      int fd;
       int o_fl = getOpenFlags(is_create, fi -> flags, path);
       cout << "[log] Open Flags: " << o_fl << endl;
 
-      if (o_fl == 1)
+      if (o_fl == 1) // File out of date
         fetchAndSyncServerFile(path, fi);
 
       else if (o_fl == 2)
@@ -251,11 +260,16 @@ extern "C"
       {
         // cache_helper->writeFileToCache(path, "");
         close(creat(cache_helper -> getTempPath(path).c_str(), 00777));
+        close(creat(cache_helper -> getCachePath(path).c_str(), 00777));
 
         // mark file as dirty.
         cache_helper -> markFileDirty(path);
 
         createOnServer(path, fi);
+      }
+
+      else if (o_fl == 4) {
+        cache_helper->getCheckInTemp(path, &fd, true, O_RDONLY, true);
       }
 
       int flags = fi -> flags;
@@ -337,6 +351,7 @@ extern "C"
       }
 
       cache_helper->writeFileToCache(path, buf.c_str());
+      cache_helper->writeFileToTemp(path, buf.c_str());
 
       return 0;
     }

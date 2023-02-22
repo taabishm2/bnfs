@@ -53,7 +53,11 @@ struct CacheHelper
 
     int writeFileToCache(const char *path, const char *data);
 
+    int writeFileToTemp(const char* path, const char* data);
+
     int isPresentInCache(const char *path);
+
+    int isPresentInTemp(const char *path);
 
     bool isOutOfDate(const char *path, int server_modified_at_epoch, int file_descriptor);
 
