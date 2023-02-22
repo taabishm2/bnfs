@@ -16,9 +16,9 @@ for env_var in ENV_VARS.items():
     print(env_var)
     assert env_var is not None
 TEST_DATA_DIR = ENV_VARS['CS739_MOUNT_POINT'] + '/test_consistency'
-FNAME = f'{TEST_DATA_DIR}/case1'
+FNAME = f'{TEST_DATA_DIR}/case2'
 print(TEST_DATA_DIR)
-TEST_CASE_NO = 1
+TEST_CASE_NO = 2
 
 
 def run_test():
@@ -42,6 +42,7 @@ def run_test():
     fs_util.close_file(fd)
     # open again
     fd = fs_util.open_file(FNAME)
+    print("THE FILE IS ON AAAA ===== !!!!", FNAME)
 
     # time for client_b to work, host_b should read the all-zero file
     cur_signal_name = next(signal_name_gen)
@@ -58,28 +59,16 @@ def run_test():
         time.sleep(1)
     print('Clientb finished')
 
-    # read the old content
-    cur_str = fs_util.read_file(fd, 32768)
-    assert len(cur_str) == 32768
-    for idx, rc in enumerate(cur_str):
-        if rc != '0':
-            print(f'Error idx:{idx} rc:{rc}')
-    fs_util.close_file(fd)
+    # client_b should have deleted the file
+    assert not fs_util.path_exists(FNAME)
+    fs_util.create_file(FNAME)
 
-    # read the things client_b wrote
-    fd = fs_util.open_file(FNAME)
-    cur_str = fs_util.read_file(fd, 200, start_off=0)
-    assert len(cur_str) == 200
-    for idx, c in enumerate(cur_str):
-        if idx >= 100:
-            assert c == 'b'
-        else:
-            assert c == '0'
     # now let's write again
-    cur_str = fs_util.gen_str_by_repeat('a', 100)
-    # use write here to see of FD's offset is correct
+    cur_str = fs_util.gen_str_by_repeat('1', 32768)
+    fd = fs_util.open_file(FNAME)
     fs_util.write_file(fd, cur_str)
     fs_util.close_file(fd)
+
     last_signal_name = cur_signal_name
     cur_signal_name = next(signal_name_gen)
     fs_util.send_signal(host_b, cur_signal_name)

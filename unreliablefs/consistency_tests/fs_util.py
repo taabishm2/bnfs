@@ -52,8 +52,8 @@ def gen_str_by_repeat(seed_str: str, l: int, tail: str = None) -> str:
     return ret_str
 
 
-def test_ssh_access(host: str) -> bool:
-    ssh_cmd = f'ssh {host} "ifconfig | grep inet"'
+def test_ssh_access(host: str, port: int) -> bool:
+    ssh_cmd = f'ssh -p {port} {host} "ifconfig | grep inet"'
     outs, _errs, ret = get_shell_cmd_output(None, ssh_cmd)
     for lo in outs:
         print(lo)
@@ -110,6 +110,7 @@ def start_another_client(host: str, test_case: int, client_id: str,
             and after it finish execution, it will remove this signal_file,
             so this client can know it.
     """
+    print("!!!!!!!!!!" + signal_fname)
     send_signal(host, signal_fname)
     signal_exists = (not poll_signal_remove(host, signal_fname))
     assert signal_exists
@@ -124,7 +125,10 @@ def start_another_client(host: str, test_case: int, client_id: str,
     assert username is not None
     sshkey_fname = f'{home_dir}/.ssh/id_rsa'
     print(f'Connect {username}@{host}')
-    client.connect(hostname=host, username=username, key_filename=sshkey_fname)
+    host = "c220g5-110502.wisc.cloudlab.us"
+    k = paramiko.RSAKey.from_private_key_file(sshkey_fname)
+    client.connect(hostname=host, port = 25610,  username=username, pkey = k)
+    #client.connect(hostname=host, username=username, key_filename=sshkey_fname)
     stdin, stdout, stderr = client.exec_command(ssh_cmd)
     # useful when connection init has issues
     #print(stdout.readlines())
@@ -138,6 +142,7 @@ def send_signal(host: str, signal_fname: str):
     Send signal to a remote client so it can keep executing.
     """
     ssh_cmd = f'ssh {host} touch {signal_fname}'
+    print(ssh_cmd)
     outs, _errs, ret = get_shell_cmd_output(None, ssh_cmd)
     for lo in outs:
         print(lo)
@@ -150,6 +155,7 @@ def poll_signal_remove(host: str, signal_fname: str) -> bool:
     """
     rmt_cmd = f'(ls {signal_fname} && echo EXISTS) || echo NOT_EXISTS'
     ssh_cmd = f'ssh {host} "{rmt_cmd}"'
+    print(ssh_cmd)
     outs, _errs, ret = get_shell_cmd_output(None, ssh_cmd)
     removed = False
     for lo in outs:
@@ -173,7 +179,7 @@ def mkdir(dir_name: str):
 
 def delete_file(fname: str):
     ret = os.unlink(fname)
-    assert ret == 0
+    #assert ret == 0
 
 
 def stat_file(fname: str) -> os.stat_result:

@@ -113,6 +113,22 @@ bool  CacheHelper::getCheckInCache(const char *path, int *file_descriptor, bool 
     return false;
 }
 
+int CacheHelper::isPresentInTemp(const char *path)
+{
+    string cache_path = getTempPath(path);
+    int file_descriptor = open(cache_path.c_str(), O_RDONLY);
+
+    return file_descriptor;
+}
+
+int CacheHelper::isPresentInCache(const char *path)
+{
+    string cache_path = getCachePath(path);
+    int file_descriptor = open(cache_path.c_str(), O_RDONLY);
+
+    return file_descriptor;
+}
+
 bool  CacheHelper::getCheckInTemp(const char *path, int *file_descriptor, bool close_file, int open_mode, bool create_new)
 {
     string temp_path = getTempPath(path);
@@ -172,6 +188,18 @@ bool CacheHelper::isCacheOutOfDate(const char *path, int server_modified_at_epoc
 
     if (file_exists_in_cache && close_file)
         close(*file_descriptor);
+
+    cout << "[LOG] file exists - OOD: " << server_modified_at_epoch << ":" << local_modified_at_epoch << endl;
+
+    return server_modified_at_epoch > local_modified_at_epoch;
+}
+
+bool CacheHelper::isOutOfDate(const char *path, int server_modified_at_epoch, int file_descriptor)
+{
+    struct stat file_stat;
+    fstat(file_descriptor, &file_stat);
+
+    int local_modified_at_epoch = static_cast<int>(static_cast<time_t>(file_stat.st_mtim.tv_sec));
 
     cout << "[LOG] file exists - OOD: " << server_modified_at_epoch << ":" << local_modified_at_epoch << endl;
 
@@ -241,6 +269,38 @@ int  CacheHelper::syncFileToTemp(const char *path, const char *data, bool close_
     return file_descriptor;
 }
 
+int CacheHelper::writeFileToCache(const char* path, const char* data) {
+    string cache_path = getCachePath(path);
+
+    ofstream file(cache_path, std::ios::binary | std::ios::out | std::ios::trunc);
+    if (!file || !file.is_open())
+    {
+        cerr << "Failed to sync cache file: " << path << endl;
+        return -1;
+    }
+
+    file.write(data, strlen(data));
+    file.close();
+
+    return 0;
+}
+
+int CacheHelper::writeFileToTemp(const char* path, const char* data) {
+    string temp_path = getTempPath(path);
+
+    ofstream file(temp_path, std::ios::binary | std::ios::out | std::ios::trunc);
+    if (!file || !file.is_open())
+    {
+        cerr << "Failed to sync temp file: " << path << endl;
+        return -1;
+    }
+
+    file.write(data, strlen(data));
+    file.close();
+
+    return 0;
+}
+
 bool  CacheHelper::setFileModifiedTime(const char *path, int epoch_time)
 {
     struct utimbuf new_times;
@@ -260,8 +320,11 @@ int CacheHelper::commitToCache(const char *path, int server_modified_at_epoch)
     string cache_path = getCachePath(path);
 
     int temp_file_fd = open(temp_path.c_str(), O_RDWR);
-    if (temp_file_fd == -1)
-        return 1;
+    if (temp_file_fd < 0) {
+        cout << "temp file not found " << temp_path << endl;
+        return -errno;
+    }
+    close(temp_file_fd);
 
     string cp_command = "cp -f " + temp_path + " " + cache_path;
     int status = system(cp_command.c_str());
@@ -302,6 +365,12 @@ void CacheHelper::markFileDirty(const char *path)
 {
     cout << "setting path dirty " << path << endl;
     dirty_files.insert(getHashedPath(path));
+}
+
+void CacheHelper::unmarkFileDirty(const char *path)
+{
+    cout << "unsetting path dirty " << path << endl;
+    std::remove(getTempPath(path).c_str());
 }
 
 // TODO (rahul): add try-catch block to make it fail safely.

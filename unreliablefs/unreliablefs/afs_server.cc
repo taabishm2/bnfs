@@ -13,6 +13,7 @@
 
 #include <sys/stat.h>
 #include <dirent.h>
+#include <pthread.h>
 
 #include <openssl/sha.h>
 
@@ -71,6 +72,11 @@ string random_string(const int len) {
 
 class FileServerServiceImpl final : public FileServer::Service
 {
+    public:
+    explicit FileServerServiceImpl() {
+        pthread_mutex_init(&lock, NULL);
+    }
+
     Status GetAttr(ServerContext *context, const SimplePathRequest *request,
                    StatResponse *reply) override
     {
@@ -82,6 +88,9 @@ class FileServerServiceImpl final : public FileServer::Service
         if (res != 0)
         {
             baseResponse.set_errorcode(-errno);
+            cout << "SERVER [NOT FOUND]" << endl;
+        } else {
+            cout << "SERVER [FOUND]" << endl;
         }
 
         reply->set_dev(stbuf.st_dev);
@@ -100,7 +109,6 @@ class FileServerServiceImpl final : public FileServer::Service
 
         reply->mutable_baseresponse()->CopyFrom(baseResponse);
 
-        cout << "SERVER [SUCCESS]" << endl;
         return Status::OK;
     }
 
@@ -193,14 +201,14 @@ class FileServerServiceImpl final : public FileServer::Service
             }
             writer->Write(reply);
 
-            cout << "SERVER [SUCCESS]" << endl;
+            cout << "SERVER [SUCCESS], created new file " << path << endl;
             return Status::OK;
         }
         cout << "File exists\n";
         reply.set_file_exists(true);
 
         string buf(BUFSIZE, '\0');
-         cout << "Reading";
+         cout << "Reading" << endl;
         while (file.read(&buf[0], BUFSIZE))
         {
             reply.set_buf(buf);
@@ -231,28 +239,30 @@ class FileServerServiceImpl final : public FileServer::Service
         if(reader->Read(&request)) {
             file_path = request.path();
             cache_path = getServerPath(file_path);
-            temp_file_path = cache_path +  random_string(20);
-
-            // open file using append mode.
-            // This should create a file if not exists.
-            outfile.open(temp_file_path, ios::out | ios::app);
+            // temp_file_path = cache_path +  random_string(20);
+            temp_file_path = cache_path;
         }
         cout << "Server PutFile " << file_path << endl;
 
+        // pthread_mutex_lock(&lock);
+        // open file using trunc mode.
+        // This should create a file if not exists.
+        outfile.open(temp_file_path, ios::out | ios::trunc);
         while (reader->Read(&request)) {
             // write contents.
             outfile << request.contents();
         }
         outfile.close();
+        // pthread_mutex_unlock(&lock);
 
         // Rename temp_file_path to file_path.
-        string cp_command = "mv -f " + temp_file_path + " " + cache_path;
-        int status = system(cp_command.c_str());
-        if (status == -1) {
-            cout << "mv system call " << cp_command << " failed\n";
-            cout << "SERVER [FAILED]" << endl;
-            return Status::CANCELLED;
-        }
+        // string cp_command = "mv -f " + temp_file_path + " " + cache_path;
+        // int status = system(cp_command.c_str());
+        // if (status == -1) {
+        //     cout << "mv system call " << cp_command << " failed\n";
+        //     cout << "SERVER [FAILED]" << endl;
+        //     return Status::CANCELLED;
+        // }
 
         // // Set file server modification time.
         struct stat stbuf;
@@ -306,6 +316,8 @@ class FileServerServiceImpl final : public FileServer::Service
         cout << "SERVER [SUCCESS]" << endl;
         return Status::OK;
     }
+
+    pthread_mutex_t lock;
 };
 
 void RunServer()

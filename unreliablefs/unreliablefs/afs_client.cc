@@ -186,100 +186,104 @@ extern "C"
       return 0;
     }
 
-    bool requiresCompleteFetchAndSync(int o_fl)
-    {
-      return (o_fl == 2 || o_fl == 3 || o_fl == 7 || o_fl == 15 || o_fl == 18 || o_fl == 19 || o_fl == 23 || o_fl == 31);
+    bool isOpenWithCreate(int flags) {
+      return ((flags & O_CREAT) == O_CREAT);
     }
 
-    bool requiresCacheToTempSync(int o_fl)
-    {
-      return (o_fl == 4 || o_fl == 5 || o_fl == 6 || o_fl == 20 || o_fl == 21 || o_fl == 22);
+    bool isOpenWithCreateNExclusive(int flags) {
+      return isOpenWithCreate(flags) && ((flags & O_EXCL) == O_EXCL);
     }
 
-    bool requiresNewCacheAndTemp(int o_fl)
-    {
-      return (o_fl == 16 || o_fl == 17);
-    }
-
-    bool requiresNoChange(int o_fl)
-    {
-      return (o_fl == 12 || o_fl == 13 || o_fl == 14 || o_fl == 28 || o_fl == 29 || o_fl == 30);
-    }
-
-    bool noFilesExist(int o_fl)
-    {
-      return (o_fl == 0 || o_fl == 1);
-    }
-
-    bool isErrorState(int o_fl)
-    {
-      return (o_fl == 8 || o_fl == 9 || o_fl == 10 || o_fl == 11 || o_fl == 24 || o_fl == 25 || o_fl == 26 || o_fl == 27);
-    }
-
-    int getOpenFlags(bool is_create, const char *path, int *temp_fd, int *cache_fd)
+    // 1 - Requires full fetch.
+    // 2 - read from local cache.
+    // 3 - create file in local cache and mark dirty.
+    int getOpenFlags(bool is_create, int flags, const char *path)
     {
       struct stat getAttrData;
       int getAttrRes = getAttr(path, &getAttrData);
       cout << "got get attr as " <<  getAttrRes << endl;
 
       // In case of a is_create call of a file not found on server, 
-      // return 16.
-      if (getAttrRes < 0 && getAttrRes == -ENOENT) {
-        return (is_create << 4);
+      if (getAttrRes == -ENOENT && (is_create | isOpenWithCreate(flags))) {
+        return 3;
       }
 
-      bool bA, bB, bC, bD, bE;
-      int server_time = static_cast<int>(static_cast<time_t>(getAttrData.st_atim.tv_sec));
+      int server_time = static_cast<int>(static_cast<time_t>(getAttrData.st_mtim.tv_sec));
 
-      bA = is_create;
-      bB = cache_helper->getCheckInTemp(path, temp_fd, false, O_RDWR, false);
-      bC = cache_helper->getCheckInCache(path, cache_fd, true, O_RDONLY);
-      bD = getAttrRes == 0;
-      bE = cache_helper->isCacheOutOfDate(path, server_time, cache_fd, true, O_RDONLY);
+      int cache_fd = cache_helper->isPresentInCache(path);
+      int temp_fd = cache_helper->isPresentInTemp(path);
 
-      cout << "FLAGS ARE: " << bA << " " << bB << " " << bC << " " << bD << " " << bE << endl;
-      return (bA << 4) | (bB << 3) | (bC << 2) | (bD << 1) | bE;
+      bool outOfDate = true;
+      if(temp_fd > 0) {
+        outOfDate = cache_helper->isOutOfDate(path, server_time, temp_fd);
+      }
+      cout << " [[CLIENT]] OUT OF DATE: " << outOfDate << endl; 
+
+      if(temp_fd < 0 && cache_fd < 0) {
+        cout << "Local temp/cache not present" << endl;
+        return 1;
+      }
+
+      if(temp_fd < 0 && cache_fd >= 0 && !outOfDate) {
+        cout << "Fresh cache present, temp absent" << endl;
+        return 4;
+      }
+
+      close(temp_fd);
+
+      if(outOfDate) {
+        cout << "file is out of date" << endl;
+        return 1;
+      }
+
+      return 2;
     }
 
     // Returns file descriptor to local file copy on success.
     int Open(const char *path, struct fuse_file_info *fi, bool is_create)
     {
-      int temp_fd, cache_fd;
-
       // We don't allow opening of dirty files. (to prevent read after write conflicts).
-      if (cache_helper->isFileDirty(path))
-        return -EIO;
+      // if (cache_helper->isFileDirty(path))
+      //   return -EIO;
 
-      int o_fl = getOpenFlags(is_create, path, &temp_fd, &cache_fd);
+      int fd;
+      int o_fl = getOpenFlags(is_create, fi -> flags, path);
       cout << "[log] Open Flags: " << o_fl << endl;
 
-      if (requiresCompleteFetchAndSync(o_fl))
-        fetchAndSyncServerFile(path, fi, is_create, &temp_fd, &cache_fd);
+      if (o_fl == 1) // File out of date
+        fetchAndSyncServerFile(path, fi);
 
-      else if (requiresCacheToTempSync(o_fl)) {
-        cache_helper->getCheckInTemp(path, &temp_fd, false, fi->flags, true);
+      else if (o_fl == 2)
+      { 
+        // Nothing to be done. Just open.
       }
-
-      else if (requiresNewCacheAndTemp (o_fl))
+      else if (o_fl == 3)
       {
-        cache_helper->syncFileToCache(path, "", false, fi->flags);
-        temp_fd = cache_helper->syncFileToTemp(path, "", false, fi->flags);
+        // cache_helper->writeFileToCache(path, "");
+        close(creat(cache_helper -> getTempPath(path).c_str(), 00777));
+        close(creat(cache_helper -> getCachePath(path).c_str(), 00777));
 
         // mark file as dirty.
         cache_helper -> markFileDirty(path);
+
+        createOnServer(path, fi);
       }
 
-      else if (requiresNoChange (o_fl))
-      {
+      else if (o_fl == 4) {
+        cache_helper->getCheckInTemp(path, &fd, true, O_RDONLY, true);
       }
 
-      else if (noFilesExist (o_fl))
-        return ENOENT;
+      int flags = fi -> flags;
+      if(isOpenWithCreateNExclusive(flags)) {
+        flags ^= O_EXCL;
+      }
 
-      else if (isErrorState (o_fl))
-        return EIO;
-
+      int temp_fd = open(cache_helper -> getTempPath(path).c_str(), flags);
       cout << "[LOG] Final FID: " << temp_fd << endl;
+      cout << "cache path: " << cache_helper -> getTempPath(path) << endl;
+      cout << "logical path: " << path << endl;
+      cout << "using flasg: " << flags << endl;
+
       if (temp_fd > -1)
       {
         return temp_fd;
@@ -288,17 +292,43 @@ extern "C"
       // Safely delete file in case of open failures.
       cache_helper -> deleteFromTemp(path);
 
-      return -1;
+      return -errno;
     }
 
-    int fetchAndSyncServerFile(const char *path, struct fuse_file_info *fi, bool is_create, int *temp_fd, int *cache_fd)
+    int createOnServer(const char *path, struct fuse_file_info *fi)
     {
       OpenReq request;
       ClientContext open_context;
       request.set_path(path);
       request.set_flag(fi->flags);
-      // TODO: No need for this right?
-      request.set_is_create(is_create);
+      request.set_is_create(true);
+
+
+      OpenResp reply;
+      unique_ptr<grpc::ClientReader<OpenResp>> reader(stub_->Open(&open_context, request));
+
+      if (!reader->Read(&reply))
+      {
+        cout << "[err] Open: failed to download file: " << path << endl;
+        return -EIO;
+      }
+
+      Status status = reader->Finish();
+      if (!status.ok())
+      {
+        cout << "[err] Open: failed to download from server. \n";
+        return -EIO;
+      }
+
+      return 0;
+    }
+
+    int fetchAndSyncServerFile(const char *path, struct fuse_file_info *fi)
+    {
+      OpenReq request;
+      ClientContext open_context;
+      request.set_path(path);
+      request.set_flag(fi->flags);
 
       OpenResp reply;
       unique_ptr<grpc::ClientReader<OpenResp>> reader(stub_->Open(&open_context, request));
@@ -321,14 +351,15 @@ extern "C"
         return -EIO;
       }
 
-      *cache_fd = cache_helper->syncFileToCache(path, buf.c_str(), false, fi->flags);
-      *temp_fd = cache_helper->syncFileToTemp(path, buf.c_str(), false, fi->flags);
+      cache_helper->writeFileToCache(path, buf.c_str());
+      cache_helper->writeFileToTemp(path, buf.c_str());
 
       return 0;
     }
 
     int Unlink(const char* file_path) {
       // Remove file from cache and temp.
+      cache_helper -> deleteFromTemp(file_path);
 
       // Remove file from server.
 
@@ -352,6 +383,28 @@ extern "C"
   }
 
   int Rename(const char* old_path, const char* new_path) {
+      int fd = cache_helper -> isPresentInCache(old_path);
+      if(fd > 0) {
+        string old_cache_path = cache_helper-> getTempPath(old_path);
+        string new_cache_path = cache_helper-> getTempPath(new_path);
+        int ret = rename(
+          old_cache_path.c_str(), new_cache_path.c_str());
+          if (ret == -1) {
+              cout << "renaming temp failed " <<
+              " old path " << old_cache_path << 
+              " new path " << new_cache_path << errno << endl;
+              return -errno;
+          }
+        cout << "renamed " << old_cache_path << " " << new_cache_path << endl;
+
+        if(cache_helper->isFileDirty(old_path)) {
+          cache_helper -> unmarkFileDirty(old_path);
+          cache_helper -> markFileDirty(new_path);
+        }
+
+        close(fd);
+      }
+
       // Prepare grpc messages.
       ClientContext context;
       RenameReq request;
@@ -369,32 +422,10 @@ extern "C"
         return -1;
       }
 
-      // rename cache files as well.
-      int ret = rename(
-        cache_helper-> getCachePath(old_path).c_str(),
-        cache_helper-> getCachePath(new_path).c_str());
-        if (ret == -1) {
-            cout << "renaming cache failed " << errno << endl;
-            return -errno;
-        }
-      cout << "renamed " << cache_helper-> getCachePath(old_path) << " " <<
-        cache_helper-> getCachePath(new_path) << endl;
-
-      ret = rename(
-        cache_helper-> getTempPath(old_path).c_str(),
-        cache_helper-> getTempPath(new_path).c_str());
-        if (ret == -1) {
-            cout << "renaming temp failed " << errno << endl;
-            return -errno;
-        }
-      cout << "renamed " << cache_helper-> getTempPath(old_path) << " " <<
-        cache_helper-> getTempPath(new_path) << endl;
-      
-
     return 0;
   }
 
-  int Flush(const char *path)
+  int Flush(const char *path, struct fuse_file_info *fi)
    {
       // Get temp file path to close.
       string temp_path = cache_helper->getTempPath(path);
@@ -429,12 +460,11 @@ extern "C"
 
       while (file.read(&buf[0], BUFSIZE))
       {
-        file.read(&buf[0], BUFSIZE);
         request.set_contents(buf);
 
         if (!writer->Write(request))
         {
-          cache_helper->deleteFromTemp(path);
+          //cache_helper->deleteFromTemp(path);
           break;
         }
       }
@@ -452,7 +482,7 @@ extern "C"
       if (!status.ok())
       {
         cout << "CLIENT: PutFile rpc failed: " << status.error_message() << endl;
-        cache_helper->deleteFromTemp(path);
+        //cache_helper->deleteFromTemp(path);
         return -1;
       }
       else
@@ -488,9 +518,9 @@ extern "C"
     return client->Open(file_path, fi, is_create);
   }
 
-  int AFS_flush(AFSClient *client, const char *file_path)
+  int AFS_flush(AFSClient *client, const char *file_path, struct fuse_file_info *fi)
   {
-    return client->Flush(file_path);
+    return client->Flush(file_path, fi);
   }
 
   int AFS_getAttr(AFSClient *client, const char *file_path, struct stat *buf)

@@ -209,8 +209,10 @@ int unreliable_chmod(const char *path, mode_t mode)
     }
     
     const char* cache_path = Cache_path(afsClient, path);
+    printf("chmod is being called for %s %s\n", path, cache_path);
     ret = chmod(cache_path, mode);
     if (ret < 0) {
+        printf("chmod failed\n");
         return -errno;
     }
 
@@ -297,7 +299,6 @@ int unreliable_read(const char *path, char *buf, size_t size, off_t offset,
     }
 
     ret = pread(fd, buf, size, offset);
-    printf("Contents in Buffer!======\n%s\n", buf);
     if (ret == -1) {
         ret = -errno;
     }
@@ -376,7 +377,7 @@ int unreliable_flush(const char *path, struct fuse_file_info *fi)
         return ret;
     }
 
-    printf("flushing fd %lu\n", fi-> fh);
+    printf("flushing fd %lu for %s\n", fi-> fh, path);
     ret = close(dup(fi->fh));
     if (ret == -1) {
         return -errno;
@@ -394,14 +395,14 @@ int unreliable_release(const char *path, struct fuse_file_info *fi)
         return ret;
     }
 
-    // Flush changes from local file to afs.
-	ret = AFS_flush(afsClient, path);
-
     // Close local cache file descriptor.
     ret = close(fi->fh);
     if (ret == -1) {
         return -errno;
     }
+
+    // Flush changes from local file to afs.
+	ret = AFS_flush(afsClient, path, fi);
 
     return 0;
 }
