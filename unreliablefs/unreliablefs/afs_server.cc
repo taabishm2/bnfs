@@ -192,12 +192,15 @@ class FileServerServiceImpl final : public FileServer::Service
 
         if (!file.is_open())
         {
-            cout << "File NOT exists, to be created: " << request->is_create();
+            cout << "File NOT exists, to be created: " << request->is_create() << endl;
             reply.set_file_exists(false);
             if (request->is_create()) {
-                if (open(path.c_str(), request->flag(), 00777) == -1) {
+                int fd = open(path.c_str(), request->flag(), 00777);
+                if (fd < 0) {
+                    cout << "FILE creation failed " << errno << endl;
                     reply.set_err(errno);
                 }
+                close(fd);
             }
             writer->Write(reply);
 
@@ -208,7 +211,6 @@ class FileServerServiceImpl final : public FileServer::Service
         reply.set_file_exists(true);
 
         string buf(BUFSIZE, '\0');
-         cout << "Reading" << endl;
         while (file.read(&buf[0], BUFSIZE))
         {
             reply.set_buf(buf);
