@@ -239,10 +239,9 @@ class FileServerServiceImpl final : public FileServer::Service
         if(reader->Read(&request)) {
             file_path = request.path();
             cache_path = getServerPath(file_path);
-            // temp_file_path = cache_path +  random_string(20);
-            temp_file_path = cache_path;
+            temp_file_path = cache_path +  random_string(20);
+            //temp_file_path = cache_path;
         }
-        cout << "Server PutFile " << file_path << endl;
 
         pthread_mutex_lock(&lock);
         // open file using trunc mode.
@@ -253,18 +252,19 @@ class FileServerServiceImpl final : public FileServer::Service
             outfile << request.contents();
         }
         outfile.close();
+
+        // Rename temp file to its actual name.
+        int rename_status = rename(temp_file_path.c_str(), cache_path.c_str());
+        if (rename_status == -1) {
+            cout << "SERVER [FAILED] errno " << errno << endl;
+            return Status::CANCELLED;
+        }
+        chmod(cache_path.c_str(), S_IRWXU);
+        cout << "Server PutFile " << file_path << " done" << endl;
+
         pthread_mutex_unlock(&lock);
 
-        // Rename temp_file_path to file_path.
-        // string cp_command = "mv -f " + temp_file_path + " " + cache_path;
-        // int status = system(cp_command.c_str());
-        // if (status == -1) {
-        //     cout << "mv system call " << cp_command << " failed\n";
-        //     cout << "SERVER [FAILED]" << endl;
-        //     return Status::CANCELLED;
-        // }
-
-        // // Set file server modification time.
+        // Set file server modification time.
         struct stat stbuf;
         int res = lstat(cache_path.c_str(), &stbuf);
         if (res != 0) {
