@@ -383,6 +383,8 @@ int unreliable_flush(const char *path, struct fuse_file_info *fi)
         return -errno;
     }
 
+	ret = AFS_flush(afsClient, path, fi);
+
     return 0;
 }
 
@@ -402,7 +404,7 @@ int unreliable_release(const char *path, struct fuse_file_info *fi)
     }
 
     // Flush changes from local file to afs.
-	ret = AFS_flush(afsClient, path, fi);
+	//ret = AFS_flush(afsClient, path, fi);
 
     return 0;
 }
