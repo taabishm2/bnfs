@@ -209,10 +209,8 @@ int unreliable_chmod(const char *path, mode_t mode)
     }
     
     const char* cache_path = Cache_path(afsClient, path);
-    printf("chmod is being called for %s %s\n", path, cache_path);
     ret = chmod(cache_path, mode);
     if (ret < 0) {
-        printf("chmod failed\n");
         return -errno;
     }
 
@@ -257,7 +255,6 @@ int unreliable_truncate(const char *path, off_t length)
 
 int unreliable_open(const char *path, struct fuse_file_info *fi)
 {
-    printf("IN unreliable_open");
     int ret = error_inject(path, OP_OPEN);
     if (ret == -ERRNO_NOOP) {
         return 0;
@@ -287,11 +284,9 @@ int unreliable_read(const char *path, char *buf, size_t size, off_t offset,
 
     int fd;
     if (fi == NULL) {
-        printf("hi1 I'M NUL :(((((())))))");
 	    fd = open(path, O_RDONLY);
     } else {
     	fd = fi->fh;
-        printf("HURRAYYYY fd ==== %d\n", fd);
     }
 
     if (fd == -1) {
@@ -310,7 +305,6 @@ int unreliable_read(const char *path, char *buf, size_t size, off_t offset,
     return ret;
 }
 
-// TODO: update this code to write on local cache.
 int unreliable_write(const char *path, const char *buf, size_t size,
                      off_t offset, struct fuse_file_info *fi)
 {
@@ -324,13 +318,12 @@ int unreliable_write(const char *path, const char *buf, size_t size,
     int fd;
     (void) fi;
     if(fi == NULL) {
-    printf("this is wrong\n");
 	fd = open(path, O_WRONLY);
     } else {
 	fd = fi->fh;
     }
 
-    printf("am writing %lu bytes to path %s\n", size, path);
+    printf("[Client] Writing %lu bytes to path %s\n", size, path);
 
     if (fd == -1) {
 	return -errno;
@@ -377,7 +370,7 @@ int unreliable_flush(const char *path, struct fuse_file_info *fi)
         return ret;
     }
 
-    printf("flushing fd %lu for %s\n", fi-> fh, path);
+    printf("Flushing fd %lu for %s\n", fi-> fh, path);
     ret = close(dup(fi->fh));
     if (ret == -1) {
         return -errno;
