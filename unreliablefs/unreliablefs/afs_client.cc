@@ -226,10 +226,17 @@ extern "C"
 
       if(temp_fd < 0 && cache_fd >= 0 && !outOfDate) {
         cout << "Fresh cache present, temp absent" << endl;
+
+        // close cache fd.
+        close(cache_fd);
+
         return 4;
       }
 
       close(temp_fd);
+      if(cache_fd > 0) {
+        close(cache_fd);
+      }
 
       if(outOfDate) {
         cout << "file is out of date" << endl;
@@ -464,7 +471,6 @@ extern "C"
 
         if (!writer->Write(request))
         {
-          //cache_helper->deleteFromTemp(path);
           break;
         }
       }
