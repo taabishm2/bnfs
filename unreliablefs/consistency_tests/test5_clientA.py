@@ -18,7 +18,7 @@ for env_var in ENV_VARS.items():
 TEST_DATA_DIR = ENV_VARS['CS739_MOUNT_POINT'] + '/test_consistency'
 FNAME = f'{TEST_DATA_DIR}/case2'
 print(TEST_DATA_DIR)
-TEST_CASE_NO = 2
+TEST_CASE_NO = 5
 
 
 def run_test():
@@ -47,8 +47,7 @@ def run_test():
     # time for client_b to work, host_b should read the all-zero file
     cur_signal_name = next(signal_name_gen)
     print("===============STARTING CLIENT B=====", cur_signal_name)
-    fs_util.start_another_client(host_b, 2, 'B', cur_signal_name)
-    # fs_util.start_another_client(host_b, 1, 'B', "python3 /tmp/test1_clientB.py")
+    fs_util.start_another_client(host_b, 5, 'B', cur_signal_name)
     print("===============STARTed CLIENT B=====")
 
     # wait until client_b finish
@@ -59,19 +58,26 @@ def run_test():
         time.sleep(1)
     print('Clientb finished')
 
-    # client_b should have deleted the file
-    assert not fs_util.path_exists(FNAME)
-    fs_util.create_file(FNAME)
+    # client_b should have restarted the afs_client on the B's machine
+    assert fs_util.path_exists(FNAME)
 
-    # now let's write again
-    cur_str = fs_util.gen_str_by_repeat('1', 32768)
+   # read file with all 0's as client B crashed before it could call it's close.
+    if not fs_util.path_exists(FNAME):
+        fs_util.record_test_result(TEST_CASE_NO, 'A', 'not exist')
+        sys.exit(1)
     fd = fs_util.open_file(FNAME)
-    fs_util.write_file(fd, cur_str)
-    fs_util.close_file(fd)
+    read_len = 32768
+    read_str = fs_util.read_file(fd, read_len, 0)
+    if len(read_str) != read_len:
+        fs_util.record_test_result(TEST_CASE_NO, 'A',
+                                   f'read_len:{len(read_str)}')
+        sys.exit(1)
+    for rc in read_str:
+        if rc != '0':
+            fs_util.record_test_result(TEST_CASE_NO, 'A',
+                                       f'read_str:{read_str}')
+            sys.exit(1)
 
-    last_signal_name = cur_signal_name
-    cur_signal_name = next(signal_name_gen)
-    fs_util.send_signal(host_b, cur_signal_name)
 
     # done
     fs_util.record_test_result(TEST_CASE_NO, 'A', 'OK')
