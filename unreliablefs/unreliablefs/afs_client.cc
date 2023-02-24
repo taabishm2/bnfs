@@ -32,6 +32,9 @@
 #include <iostream>
 #include <memory>
 #include <string>
+#include <queue>
+#include <algorithm>
+#include <random>
 
 #include <grpcpp/grpcpp.h>
 
@@ -68,10 +71,102 @@ using namespace std;
 extern "C"
 {
 
+  struct QueueEntry {
+
+    // Must be populated always
+    int operation_id; /* Use 1 for write, 2 for close */
+    const char *path; /* Path of file for close*/
+    struct fuse_file_info *fi;
+
+    // Must be populated for writes
+    const char *buf;  
+    size_t size;
+    off_t offset;
+
+  };
+
+  static queue<QueueEntry> op_queue;
+
   // gRPC client.
   struct AFSClient
   {
     // Member functions.
+
+    void addToQueue(int operation_id, const char *path, struct fuse_file_info *fi, const char *buf, size_t size, off_t offset)
+    {
+
+      QueueEntry entry;
+      entry.operation_id = operation_id;
+      entry.path = path;
+      entry.fi = fi;
+      entry.buf = buf;
+      entry.size = size;
+      entry.offset = offset;
+
+      op_queue.push(entry);
+      cout << " [QUEUE] Inserted entry, path: " << path << ", operation: " << operation_id << endl;
+    }
+
+    int executeQueueHead(void)
+    {
+      if (op_queue.empty())
+        return 0;
+
+      QueueEntry headVal = op_queue.front();
+      op_queue.pop();
+      cout << " [QUEUE] Popped out, path: " << headVal.path << ", operation: " << headVal.operation_id << endl;
+
+      if (headVal.operation_id == 1)
+      {
+        int fileDescriptor = open(headVal.path, O_RDWR, 0666);
+        if (fileDescriptor == -1)
+        {
+          std::cerr << " [QUEUE] Failed to open file: " << headVal.path << std::endl;
+          return -1;
+        }
+
+        ssize_t bytesWritten = pwrite(fileDescriptor, headVal.buf, headVal.size, headVal.offset);
+        if (bytesWritten == -1)
+        {
+          std::cerr << " [QUEUE] Failed to write data to file: " << headVal.path << std::endl;
+          close(fileDescriptor);
+          return -1;
+        }
+
+        std::cout << " [QUEUE] Wrote " << bytesWritten << " bytes to file: " << headVal.path << std::endl;
+        close(fileDescriptor);
+        return 0;
+      }
+      else if (headVal.operation_id == 2)
+      {
+        return close(dup(headVal.fi->fh));
+      }
+      return -1;
+    }
+
+    void shuffleQueue(void)
+    {
+      if (op_queue.empty())
+        return;
+
+      std::vector<QueueEntry> vec(op_queue.size());
+      for (size_t i = 0; i < vec.size(); ++i)
+      {
+        vec[i] = op_queue.front();
+        op_queue.pop();
+      }
+
+      std::random_device rd;
+      std::mt19937 gen(rd());
+      std::shuffle(vec.begin(), vec.end(), gen);
+
+      cout << " [QUEUE] shuffling elements" << endl;
+      for (const auto &element : vec)
+      {
+        op_queue.push(element);
+      }
+      cout << " [QUEUE] Finished shuffling elements" << endl;
+    }
 
     AFSClient(string cache_root)
         : stub_(FileServer::NewStub(
@@ -564,6 +659,18 @@ extern "C"
 
   void Cache_markFileDirty(AFSClient* client, const char *path) {
     return client -> cache_helper -> markFileDirty(path);
+  }
+
+  void QUEUE_addToQueue(AFSClient* client, int operation_id, const char *path, struct fuse_file_info *fi, const char *buf, size_t size, off_t offset) {
+    return client -> addToQueue(operation_id, path, fi, buf, size, offset); 
+  }
+
+  int QUEUE_executeQueueHead(AFSClient* client) {
+    return client -> executeQueueHead();
+  }
+
+  void QUEUE_shuffleQueue(AFSClient* client) {
+    return client -> shuffleQueue();
   }
 
   char* Cache_path(AFSClient* client, const char *path) {
