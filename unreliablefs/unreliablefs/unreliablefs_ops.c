@@ -316,11 +316,9 @@ int unreliable_write(const char *path, const char *buf, size_t size,
                      off_t offset, struct fuse_file_info *fi)
 {
     int ret = error_inject(path, OP_WRITE);
-     printf("the ret is ==== %d\n", ret);
     if (ret == -ERRNO_NOOP) {
         return 0;
-    } else if (ret == -ERR_INSERT_TO_QUEUE) {
-        printf("YAYAYYYYY ADDING TO QQQQQQ \n");
+    } else if (ret = -ERR_INSERT_TO_QUEUE) {
         // populate queue structs for write here.
         QUEUE_addToQueue(afsClient, 2, path, fi, buf, size, offset);
         QUEUE_shuffleQueue(afsClient);
@@ -379,11 +377,9 @@ int unreliable_statfs(const char *path, struct statvfs *buf)
 int unreliable_flush(const char *path, struct fuse_file_info *fi)
 {
     int ret = error_inject(path, OP_FLUSH);
-    printf("the ret is ==== %d\n", ret);
     if (ret == -ERRNO_NOOP) {
         return 0;
     } else if (ret == -ERR_INSERT_TO_QUEUE) {
-        printf("YAYAYYYYY ADDING TO QQQQQQ \n");
         // populate the queue
         QUEUE_addToQueue(afsClient, 1, path, fi, NULL, 0, 0);
         QUEUE_shuffleQueue(afsClient);

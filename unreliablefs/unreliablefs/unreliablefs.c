@@ -140,8 +140,8 @@ void *pollExecutionQueue(void* client)
 
         // TODO: replace it with queue execution routine.
         printf("I am executing queue head.\n");
-        int ret = QUEUE_executeQueueHead(afsClient);
-        printf("here result %d\n", ret);
+        char* path = Cache_path(afsClient, "abc");
+        printf("here path %s", path);
     }
 
     return NULL;
