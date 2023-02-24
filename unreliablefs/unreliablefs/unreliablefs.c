@@ -7,6 +7,8 @@
 #include <string.h>
 #include <limits.h>
 #include <stdlib.h>
+#include <pthread.h>
+#include <unistd.h> 
 
 #include <fuse.h>
 
@@ -129,6 +131,19 @@ int is_dir(const char *path) {
     return S_ISDIR(statbuf.st_mode);
 }
 
+// Polling function to execute the queue.
+void *pollExecutionQueue(void *args)
+{
+    while(true) {
+        usleep(100);
+
+        // TODO: replace it with queue execution routine.
+        printf("I am polling stuff.\n");
+    }
+
+    return NULL;
+}
+
 int main(int argc, char *argv[])
 {
     struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
@@ -177,8 +192,19 @@ int main(int argc, char *argv[])
     // Initialize client
     afsClient = NewAFSClient("/");
 
+    // Poll execution queue.
+    pthread_t execution_thread_id;
+
+    printf("Before Thread\n");
+    pthread_create(&execution_thread_id, NULL, pollExecutionQueue, NULL);    
+    printf("After Thread\n");
+
+    // Start fuse system. This blocks code.
     fprintf(stdout, "starting FUSE filesystem unreliablefs\n");
     int ret = fuse_main(args.argc, args.argv, &unreliable_ops, NULL);
+
+    // Wait for polling execution.
+    pthread_join(execution_thread_id, NULL);
 
     /* cleanup */
     fuse_opt_free_args(&args);
