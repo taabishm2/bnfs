@@ -132,13 +132,16 @@ int is_dir(const char *path) {
 }
 
 // Polling function to execute the queue.
-void *pollExecutionQueue(void *args)
+void *pollExecutionQueue(void* client)
 {
+    AFSClient* afsClient = (AFSClient*) client;
     while(true) {
-        usleep(100);
+        usleep(1000000);
 
         // TODO: replace it with queue execution routine.
-        printf("I am polling stuff.\n");
+        printf("I am executing queue head.\n");
+        char* path = Cache_path(afsClient, "abc");
+        printf("here path %s", path);
     }
 
     return NULL;
@@ -196,7 +199,7 @@ int main(int argc, char *argv[])
     pthread_t execution_thread_id;
 
     printf("Before Thread\n");
-    pthread_create(&execution_thread_id, NULL, pollExecutionQueue, NULL);    
+    pthread_create(&execution_thread_id, NULL, pollExecutionQueue, afsClient);    
     printf("After Thread\n");
 
     // Start fuse system. This blocks code.
