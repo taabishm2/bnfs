@@ -662,6 +662,7 @@ extern "C"
   }
 
   void QUEUE_addToQueue(AFSClient* client, int operation_id, const char *path, struct fuse_file_info *fi, const char *buf, size_t size, off_t offset) {
+    cout << "in add to qqqqq====\n";
     return client -> addToQueue(operation_id, path, fi, buf, size, offset); 
   }
 
