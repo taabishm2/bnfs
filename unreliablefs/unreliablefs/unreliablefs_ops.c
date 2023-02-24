@@ -322,8 +322,9 @@ int unreliable_write(const char *path, const char *buf, size_t size,
     } else if (ret == -ERR_INSERT_TO_QUEUE) {
         printf("YAYAYYYYY ADDING TO QQQQQQ \n");
         // populate queue structs for write here.
-        QUEUE_addToQueue(afsClient, 2, path, fi, buf, size, offset);
-        QUEUE_shuffleQueue(afsClient);
+        QUEUE_addToQueue(afsClient, 1, path, fi, buf, size, offset);
+        // QUEUE_shuffleQueue(afsClient);
+
         return size;
     } else if (ret) {
         return ret;
@@ -332,7 +333,6 @@ int unreliable_write(const char *path, const char *buf, size_t size,
     int fd;
     (void) fi;
     if(fi == NULL) {
-    printf("this is wrong\n");
 	fd = open(path, O_WRONLY);
     } else {
 	fd = fi->fh;
@@ -385,7 +385,7 @@ int unreliable_flush(const char *path, struct fuse_file_info *fi)
     } else if (ret == -ERR_INSERT_TO_QUEUE) {
         printf("YAYAYYYYY ADDING TO QQQQQQ \n");
         // populate the queue
-        QUEUE_addToQueue(afsClient, 1, path, fi, NULL, 0, 0);
+        QUEUE_addToQueue(afsClient, 2, path, fi, NULL, 0, 0);
         QUEUE_shuffleQueue(afsClient);
         return 0;
     } else if (ret) {

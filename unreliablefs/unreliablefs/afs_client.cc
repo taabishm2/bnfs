@@ -75,8 +75,9 @@ extern "C"
 
     // Must be populated always
     int operation_id; /* Use 1 for write, 2 for close */
-    const char *path; /* Path of file for close*/
+    string path; /* Path of file for close*/
     struct fuse_file_info *fi;
+    int fh;
 
     // Must be populated for writes
     const char *buf;  
@@ -92,19 +93,71 @@ extern "C"
   {
     // Member functions.
 
+    //////////////////////// Queue Ops ///////////////////////
+
     void addToQueue(int operation_id, const char *path, struct fuse_file_info *fi, const char *buf, size_t size, off_t offset)
     {
 
       QueueEntry entry;
       entry.operation_id = operation_id;
-      entry.path = path;
+      entry.path = string(path);
       entry.fi = fi;
+
+      if(fi != NULL) {
+        entry.fh = fi -> fh;
+      }
       entry.buf = buf;
       entry.size = size;
       entry.offset = offset;
 
       op_queue.push(entry);
-      cout << " [QUEUE] Inserted entry, path: " << path << ", operation: " << operation_id << endl;
+      cout << " [QUEUE] Inserted entry, path: " << entry.path << ", operation: " << entry.operation_id << endl;
+    }
+
+    // Returns 0 - success, -1 on failure.
+    // This function mirrors unreliable_write without any error injection.
+    int executePendingWriteOp(QueueEntry q) {
+      // perform local write.
+        string temp_path = cache_helper -> getTempPath(q.path.c_str());
+
+        int fileDescriptor = open(temp_path.c_str(), O_RDWR, 0666);
+        if (fileDescriptor == -1)
+        {
+          std::cerr << " [QUEUE] Failed to open file: " << q.path << std::endl;
+          return -1;
+        }
+
+        ssize_t bytesWritten = pwrite(fileDescriptor, q.buf, q.size, q.offset);
+        if (bytesWritten == -1)
+        {
+          std::cerr << " [QUEUE] Failed to write data to file: " << q.path << std::endl;
+          close(fileDescriptor);
+
+          return -1;
+        }
+
+        std::cout << " [QUEUE] Wrote " << bytesWritten << " bytes to file: " << q.path << std::endl;
+        close(fileDescriptor);
+
+        // Mark file as dirty.
+        cache_helper -> markFileDirty(q.path.c_str());
+
+        // No remote operation to be performed here.
+
+        return 0;
+    }
+
+    // Returns 0 - success, -1 on failure.
+    // This function mirrors unreliable_write without any error injection.
+    int executePendingFlushOp(QueueEntry q) {
+      // Execute local flush.
+      int ret = close(dup(q.fh));
+      if (ret == -1) {
+          return -errno;
+      }
+
+      // Perform remote flush.
+      return Flush(q.path.c_str(), NULL);
     }
 
     int executeQueueHead(void)
@@ -118,29 +171,13 @@ extern "C"
 
       if (headVal.operation_id == 1)
       {
-        int fileDescriptor = open(headVal.path, O_RDWR, 0666);
-        if (fileDescriptor == -1)
-        {
-          std::cerr << " [QUEUE] Failed to open file: " << headVal.path << std::endl;
-          return -1;
-        }
-
-        ssize_t bytesWritten = pwrite(fileDescriptor, headVal.buf, headVal.size, headVal.offset);
-        if (bytesWritten == -1)
-        {
-          std::cerr << " [QUEUE] Failed to write data to file: " << headVal.path << std::endl;
-          close(fileDescriptor);
-          return -1;
-        }
-
-        std::cout << " [QUEUE] Wrote " << bytesWritten << " bytes to file: " << headVal.path << std::endl;
-        close(fileDescriptor);
-        return 0;
-      }
+        return executePendingWriteOp(headVal);
+      } 
       else if (headVal.operation_id == 2)
       {
-        return close(dup(headVal.fi->fh));
+        return executePendingFlushOp(headVal);
       }
+
       return -1;
     }
 
@@ -167,6 +204,8 @@ extern "C"
       }
       cout << " [QUEUE] Finished shuffling elements" << endl;
     }
+
+    /////////////////////// AFS client ops //////////////////////////////////
 
     AFSClient(string cache_root)
         : stub_(FileServer::NewStub(
@@ -601,7 +640,7 @@ extern "C"
     CacheHelper *cache_helper;
   };
 
-  // Port calls to C-code.
+  /////////////////////// Port calls to C-code //////////////////////////////////
 
   AFSClient *NewAFSClient(char *cache_root)
   {

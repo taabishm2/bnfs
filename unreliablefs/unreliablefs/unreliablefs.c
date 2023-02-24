@@ -139,9 +139,10 @@ void *pollExecutionQueue(void* client)
         usleep(1000000);
 
         // TODO: replace it with queue execution routine.
-        printf("I am executing queue head.\n");
         int ret = QUEUE_executeQueueHead(afsClient);
-        printf("here result %d\n", ret);
+        if(ret != 0) {
+            printf("here result %d\n", ret);
+        }
     }
 
     return NULL;
