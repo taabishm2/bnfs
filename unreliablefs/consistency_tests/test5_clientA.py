@@ -16,13 +16,13 @@ for env_var in ENV_VARS.items():
     print(env_var)
     assert env_var is not None
 TEST_DATA_DIR = ENV_VARS['CS739_MOUNT_POINT'] + '/test_consistency'
-FNAME = f'{TEST_DATA_DIR}/case2'
+FNAME = f'{TEST_DATA_DIR}/case5'
 print(TEST_DATA_DIR)
 TEST_CASE_NO = 5
 
 
 def run_test():
-    host_b = ENV_VARS['CS739_CLIENT_B']
+     host_b = ENV_VARS['CS739_CLIENT_B']
     port_b = ENV_VARS['CS739_CLIENT_B_PORT']
     assert fs_util.test_ssh_access(host_b, port_b)
     signal_name_gen = fs_util.get_fs_signal_name()
@@ -42,13 +42,10 @@ def run_test():
     fs_util.close_file(fd)
     # open again
     fd = fs_util.open_file(FNAME)
-    print("THE FILE IS ON AAAA ===== !!!!", FNAME)
 
     # time for client_b to work, host_b should read the all-zero file
     cur_signal_name = next(signal_name_gen)
-    print("===============STARTING CLIENT B=====", cur_signal_name)
     fs_util.start_another_client(host_b, 5, 'B', cur_signal_name)
-    print("===============STARTed CLIENT B=====")
 
     # wait until client_b finish
     while True:

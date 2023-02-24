@@ -9,22 +9,25 @@ This is ClientA.
 '''
 
 cs739_env_vars = [
-    'CS739_CLIENT_A', 'CS739_CLIENT_B', 'CS739_SERVER', 'CS739_MOUNT_POINT'
+    'CS739_CLIENT_A', 'CS739_CLIENT_A_PORT', 'CS739_CLIENT_B', 'CS739_CLIENT_B_PORT', 'CS739_SERVER', 'CS739_MOUNT_POINT'
 ]
 ENV_VARS = {var_name: os.environ.get(var_name) for var_name in cs739_env_vars}
 for env_var in ENV_VARS.items():
     print(env_var)
     assert env_var is not None
 TEST_DATA_DIR = ENV_VARS['CS739_MOUNT_POINT'] + '/test_consistency'
-FNAME = f'{TEST_DATA_DIR}/case4'
+FNAME = f'{TEST_DATA_DIR}/case1'
 print(TEST_DATA_DIR)
 TEST_CASE_NO = 4
 
 
 def run_test():
     host_b = ENV_VARS['CS739_CLIENT_B']
-    assert fs_util.test_ssh_access(host_b)
+    port_b = ENV_VARS['CS739_CLIENT_B_PORT']
+    assert fs_util.test_ssh_access(host_b, port_b)
     signal_name_gen = fs_util.get_fs_signal_name()
+    host_b = "-p " + port_b + " "+  host_b
+    print(host_b)
 
     if not fs_util.path_exists(TEST_DATA_DIR):
         fs_util.mkdir(TEST_DATA_DIR)
@@ -32,7 +35,6 @@ def run_test():
     # init
     if not fs_util.path_exists(FNAME):
         fs_util.create_file(FNAME)
-
     init_str = fs_util.gen_str_by_repeat('A', 500)
     fd = fs_util.open_file(FNAME)
     fs_util.write_file(fd, init_str)
