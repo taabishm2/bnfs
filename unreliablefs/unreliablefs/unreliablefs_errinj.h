@@ -22,6 +22,7 @@
 #define MIN_PROBABLITY 0
 #define MAX_PROBABLITY 100
 #define ERRNO_NOOP -999
+#define ERR_INSERT_TO_QUEUE -1000
 #define DEFAULT_SIGNAL_NAME SIGKILL
 
 int error_inject(const char* path, fuse_op operation);
@@ -37,13 +38,17 @@ const char *errinj_name[] =
     "errinj_kill_caller",
     "errinj_noop",
     "errinj_slowdown",
+    "errinj_alice_reorder",
+    "errinj_alice_delay",
 };
 
 typedef enum {
-    ERRINJ_ERRNO,
+    ERRINJ_ERRNO = 0,
     ERRINJ_KILL_CALLER,
     ERRINJ_NOOP,
     ERRINJ_SLOWDOWN,
+    ERRINJ_ALICE_REORDER,
+    ERRINJ_ALICE_DELAY,
 } errinj_type;
 
 typedef struct errinj_conf errinj_conf;

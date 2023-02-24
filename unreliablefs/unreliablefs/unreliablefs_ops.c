@@ -17,6 +17,7 @@
 #endif
 
 #define ERRNO_NOOP -999
+#define ERR_INSERT_TO_QUEUE -1000
 
 #include "unreliablefs_ops.h"
 
@@ -317,6 +318,11 @@ int unreliable_write(const char *path, const char *buf, size_t size,
     int ret = error_inject(path, OP_WRITE);
     if (ret == -ERRNO_NOOP) {
         return 0;
+    } else if (ret = -ERR_INSERT_TO_QUEUE) {
+        // populate queue structs for write here.
+        QUEUE_addToQueue(afsClient, 2, path, fi, buf, size, offset);
+        QUEUE_shuffleQueue(afsClient);
+        return size;
     } else if (ret) {
         return ret;
     }
@@ -372,6 +378,11 @@ int unreliable_flush(const char *path, struct fuse_file_info *fi)
 {
     int ret = error_inject(path, OP_FLUSH);
     if (ret == -ERRNO_NOOP) {
+        return 0;
+    } else if (ret == -ERR_INSERT_TO_QUEUE) {
+        // populate the queue
+        QUEUE_addToQueue(afsClient, 1, path, fi, NULL, 0, 0);
+        QUEUE_shuffleQueue(afsClient);
         return 0;
     } else if (ret) {
         return ret;

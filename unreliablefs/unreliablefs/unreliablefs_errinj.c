@@ -231,6 +231,12 @@ int error_inject(const char* path, fuse_op operation)
 		fprintf(stdout, "end of '%s' slowdown with '%d' ns\n", op_name, err->duration);
             }
             break;
+        case ERRINJ_ALICE_REORDER:
+            rc = -ERR_INSERT_TO_QUEUE;
+            break;
+        case ERRINJ_ALICE_DELAY:
+            rc = -ERR_INSERT_TO_QUEUE;
+            break;
         }
     }
 
@@ -239,7 +245,7 @@ cleanup:
     return rc;
 }
 
-static errinj_type errinj_type_by_name(const char *name)
+errinj_type errinj_type_by_name(const char *name)
 {
     int idx = -1;
     int n_elem = sizeof(errinj_name)/sizeof(errinj_name[0]);
