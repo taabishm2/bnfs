@@ -53,7 +53,7 @@ void Cache_markFileDirty(AFSClient* client, const char *path);
 
 char* Cache_path(AFSClient* client, const char *path);
 
-void QUEUE_addToQueue(AFSClient* client, int operation_id, const char *path, struct fuse_file_into *fi, const char *buf, size_t size, off_t offset);
+void QUEUE_addToQueue(AFSClient* client, int operation_id, const char *path, struct fuse_file_info *fi, const char *buf, size_t size, off_t offset);
 
 int QUEUE_executeQueueHead(AFSClient* client);
 

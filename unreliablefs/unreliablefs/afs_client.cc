@@ -76,7 +76,7 @@ extern "C"
     // Must be populated always
     int operation_id; /* Use 1 for write, 2 for close */
     const char *path; /* Path of file for close*/
-    struct fuse_file_info *fi
+    struct fuse_file_info *fi;
 
     // Must be populated for writes
     const char *buf;  
@@ -85,14 +85,14 @@ extern "C"
 
   };
 
-  static queue<QueueEntry> queue;
+  static queue<QueueEntry> op_queue;
 
   // gRPC client.
   struct AFSClient
   {
     // Member functions.
 
-    void addToQueue(int operation_id, const char *path, struct fuse_file_into *fi, const char *buf, size_t size, off_t offset)
+    void addToQueue(int operation_id, const char *path, struct fuse_file_info *fi, const char *buf, size_t size, off_t offset)
     {
 
       QueueEntry entry;
@@ -103,17 +103,17 @@ extern "C"
       entry.size = size;
       entry.offset = offset;
 
-      queue.push(entry);
+      op_queue.push(entry);
       cout << " [QUEUE] Inserted entry, path: " << path << ", operation: " << operation_id << endl;
     }
 
     int executeQueueHead(void)
     {
-      if (intQueue.empty())
-        return;
+      if (op_queue.empty())
+        return 0;
 
-      QueueEntry headVal = queue.front();
-      queue.pop();
+      QueueEntry headVal = op_queue.front();
+      op_queue.pop();
       cout << " [QUEUE] Popped out, path: " << headVal.path << ", operation: " << headVal.operation_id << endl;
 
       if (headVal.operation_id == 1)
@@ -141,18 +141,19 @@ extern "C"
       {
         return close(dup(headVal.fi->fh));
       }
+      return -1;
     }
 
     void shuffleQueue(void)
     {
-      if (queue.empty())
+      if (op_queue.empty())
         return;
 
-      std::vector<int> vec(queue.size());
+      std::vector<QueueEntry> vec(op_queue.size());
       for (size_t i = 0; i < vec.size(); ++i)
       {
-        vec[i] = queue.front();
-        queue.pop();
+        vec[i] = op_queue.front();
+        op_queue.pop();
       }
 
       std::random_device rd;
@@ -162,7 +163,7 @@ extern "C"
       cout << " [QUEUE] shuffling elements" << endl;
       for (const auto &element : vec)
       {
-        queue.push(element);
+        op_queue.push(element);
       }
       cout << " [QUEUE] Finished shuffling elements" << endl;
     }
@@ -660,7 +661,7 @@ extern "C"
     return client -> cache_helper -> markFileDirty(path);
   }
 
-  void QUEUE_addToQueue(AFSClient* client, int operation_id, const char *path, struct fuse_file_into *fi, const char *buf, size_t size, off_t offset) {
+  void QUEUE_addToQueue(AFSClient* client, int operation_id, const char *path, struct fuse_file_info *fi, const char *buf, size_t size, off_t offset) {
     return client -> addToQueue(operation_id, path, fi, buf, size, offset); 
   }
 
