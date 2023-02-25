@@ -214,8 +214,8 @@ extern "C"
       int temp_fd = cache_helper->isPresentInTemp(path);
 
       bool outOfDate = true;
-      if(temp_fd > 0) {
-        outOfDate = cache_helper->isOutOfDate(path, server_time, temp_fd);
+      if(cache_fd > 0) {
+        outOfDate = cache_helper->isOutOfDate(path, server_time, cache_fd);
       }
       cout << " [[CLIENT]] OUT OF DATE: " << outOfDate << endl; 
 
