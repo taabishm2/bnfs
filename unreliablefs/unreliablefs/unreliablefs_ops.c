@@ -386,11 +386,7 @@ int unreliable_flush(const char *path, struct fuse_file_info *fi)
     } else if (ret == -ERR_ALICE_REORDER) {
         // populate the queue with operation id 2.
         // Shuffle queue.
-        ret = close(dup(fi->fh));
-    if (ret == -1) {
-        return -errno;
-    }
-    
+        
         QUEUE_addToQueue(afsClient, 2, 0, path, fi, NULL, 0, 0);
         QUEUE_shuffleQueue(afsClient);
 

@@ -230,13 +230,23 @@ extern "C"
       int num_ops = op_queue.size();
 
       // Do nothing if num of ops is less than 2.
-      if(num_ops < 2) {
+      if(num_ops < 3) {
         return;
       }
 
+      // shuffles w1, c, w2 -> w1, c, w2.
       auto headVal = op_queue.front();
       op_queue.pop();
+
+      auto mid = op_queue.front();
+      op_queue.pop();
+
+      auto tail = op_queue.front();
+      op_queue.pop();
+
       op_queue.push(headVal);
+      op_queue.push(tail);
+      op_queue.push(mid);
 
       cout << " [QUEUE] Finished shuffling elements" << endl;
     }
@@ -263,7 +273,7 @@ extern "C"
 
     AFSClient(string cache_root)
         : stub_(FileServer::NewStub(
-              grpc::CreateChannel("172.16.108.2:50051",
+              grpc::CreateChannel("localhost:50051",
                                   grpc::InsecureChannelCredentials()))),
           cache_root(cache_root) {}
 
@@ -402,7 +412,7 @@ extern "C"
       int temp_fd = cache_helper->isPresentInTemp(path);
 
       bool outOfDate = true;
-      if(temp_fd > 0) {
+      if(cache_fd > 0) {
         outOfDate = cache_helper->isOutOfDate(path, server_time, cache_fd);
       }
       cout << " [[CLIENT]] OUT OF DATE: " << outOfDate << endl; 

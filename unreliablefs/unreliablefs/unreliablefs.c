@@ -136,7 +136,7 @@ void *pollExecutionQueue(void* client)
 {
     AFSClient* afsClient = (AFSClient*) client;
     while(true) {
-        usleep(1000000);
+        usleep(100000);
 
         // // Execute pending ops queue.
         QUEUE_printQueue(afsClient);
