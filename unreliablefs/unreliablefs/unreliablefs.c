@@ -138,7 +138,9 @@ void *pollExecutionQueue(void* client)
     while(true) {
         usleep(1000000);
 
-        // TODO: replace it with queue execution routine.
+        // // Execute pending ops queue.
+        QUEUE_printQueue(afsClient);
+        
         int ret = QUEUE_executeQueueHead(afsClient);
         if(ret != 0) {
             printf("here result %d\n", ret);

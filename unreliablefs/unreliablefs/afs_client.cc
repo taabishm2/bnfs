@@ -17,6 +17,7 @@
 #include <dirent.h>
 #include <errno.h>
 #include <sys/time.h>
+#include <chrono>
 #ifdef HAVE_SETXATTR
 #include <sys/xattr.h>
 #endif
@@ -65,6 +66,7 @@ using grpc::ClientWriter;
 using grpc::Status;
 
 using namespace std;
+using namespace chrono;
 
 #define BUFSIZE 65500
 
@@ -84,6 +86,8 @@ extern "C"
     size_t size;
     off_t offset;
 
+    // Time at which entry is to be executed thereafter.
+    long long execution_timestamp_millis;
   };
 
   static queue<QueueEntry> op_queue;
@@ -95,9 +99,15 @@ extern "C"
 
     //////////////////////// Queue Ops ///////////////////////
 
-    void addToQueue(int operation_id, const char *path, struct fuse_file_info *fi, const char *buf, size_t size, off_t offset)
-    {
+    // Returns current millis.
+    long long int getCurrentMillis() {
+      auto millis = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
+      return millis;
+    }
 
+    void addToQueue(int operation_id, int delay, const char *path,
+      struct fuse_file_info *fi, const char *buf, size_t size, off_t offset)
+    {
       QueueEntry entry;
       entry.operation_id = operation_id;
       entry.path = string(path);
@@ -109,6 +119,9 @@ extern "C"
       entry.buf = buf;
       entry.size = size;
       entry.offset = offset;
+
+      auto curr_millis = getCurrentMillis();
+      entry.execution_timestamp_millis = curr_millis + delay;
 
       op_queue.push(entry);
       cout << " [QUEUE] Inserted entry, path: " << entry.path << ", operation: " << entry.operation_id << endl;
@@ -150,11 +163,11 @@ extern "C"
     // Returns 0 - success, -1 on failure.
     // This function mirrors unreliable_write without any error injection.
     int executePendingFlushOp(QueueEntry q) {
-      // Execute local flush.
-      int ret = close(dup(q.fh));
-      if (ret == -1) {
-          return -errno;
-      }
+      // Won't be executing local flush as it would have been closed by now.
+      // int ret = close(dup(q.fh));
+      // if (ret == -1) {
+      //     return -errno;
+      // }
 
       // Perform remote flush.
       return Flush(q.path.c_str(), NULL);
@@ -165,7 +178,13 @@ extern "C"
       if (op_queue.empty())
         return 0;
 
+      // Check if head can be executed.
       QueueEntry headVal = op_queue.front();
+      if(getCurrentMillis() < headVal.execution_timestamp_millis) {
+        cout << "Op's execution time is yet to come. Not executing \n";
+        return 0;
+      }
+
       op_queue.pop();
       cout << " [QUEUE] Popped out, path: " << headVal.path << ", operation: " << headVal.operation_id << endl;
 
@@ -205,11 +224,46 @@ extern "C"
       cout << " [QUEUE] Finished shuffling elements" << endl;
     }
 
+    void weirdShuffle(void)
+    {
+      cout << "performing weird shuff\n" << endl;
+      int num_ops = op_queue.size();
+
+      // Do nothing if num of ops is less than 2.
+      if(num_ops < 2) {
+        return;
+      }
+
+      auto headVal = op_queue.front();
+      op_queue.pop();
+      op_queue.push(headVal);
+
+      cout << " [QUEUE] Finished shuffling elements" << endl;
+    }
+
+    void printQueue(void) {
+      int num_ops = op_queue.size();
+
+      if(num_ops > 0) {
+        cout << "current millis " << getCurrentMillis() << endl;
+        cout << endl;
+      }
+
+      for(int i = 0; i < num_ops ; i++) {
+        cout << "elem " << i << " " << op_queue.front().operation_id 
+        << " " << op_queue.front().execution_timestamp_millis  << "\n";
+        op_queue.push(op_queue.front());
+        op_queue.pop();
+      }
+
+      return;
+    }
+
     /////////////////////// AFS client ops //////////////////////////////////
 
     AFSClient(string cache_root)
         : stub_(FileServer::NewStub(
-              grpc::CreateChannel("localhost:50051",
+              grpc::CreateChannel("172.16.108.2:50051",
                                   grpc::InsecureChannelCredentials()))),
           cache_root(cache_root) {}
 
@@ -349,7 +403,7 @@ extern "C"
 
       bool outOfDate = true;
       if(temp_fd > 0) {
-        outOfDate = cache_helper->isOutOfDate(path, server_time, temp_fd);
+        outOfDate = cache_helper->isOutOfDate(path, server_time, cache_fd);
       }
       cout << " [[CLIENT]] OUT OF DATE: " << outOfDate << endl; 
 
@@ -423,7 +477,7 @@ extern "C"
       cout << "[LOG] Final FID: " << temp_fd << endl;
       cout << "cache path: " << cache_helper -> getTempPath(path) << endl;
       cout << "logical path: " << path << endl;
-      cout << "using flasg: " << flags << endl;
+      cout << "using flags: " << flags << endl;
 
       if (temp_fd > -1)
       {
@@ -700,9 +754,8 @@ extern "C"
     return client -> cache_helper -> markFileDirty(path);
   }
 
-  void QUEUE_addToQueue(AFSClient* client, int operation_id, const char *path, struct fuse_file_info *fi, const char *buf, size_t size, off_t offset) {
-    cout << "in add to qqqqq====\n";
-    return client -> addToQueue(operation_id, path, fi, buf, size, offset); 
+  void QUEUE_addToQueue(AFSClient* client, int operation_id, int delay, const char *path, struct fuse_file_info *fi, const char *buf, size_t size, off_t offset) {
+    return client -> addToQueue(operation_id, delay, path, fi, buf, size, offset); 
   }
 
   int QUEUE_executeQueueHead(AFSClient* client) {
@@ -710,7 +763,11 @@ extern "C"
   }
 
   void QUEUE_shuffleQueue(AFSClient* client) {
-    return client -> shuffleQueue();
+    return client -> weirdShuffle();
+  }
+
+  void QUEUE_printQueue(AFSClient* client) {
+    return client -> printQueue();
   }
 
   char* Cache_path(AFSClient* client, const char *path) {

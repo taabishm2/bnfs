@@ -23,6 +23,8 @@
 #define MAX_PROBABLITY 100
 #define ERRNO_NOOP -999
 #define ERR_INSERT_TO_QUEUE -1000
+#define ERR_ALICE_REORDER -1001
+#define ERR_ALICE_DELAY -1002
 #define DEFAULT_SIGNAL_NAME SIGKILL
 
 int error_inject(const char* path, fuse_op operation);

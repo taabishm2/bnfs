@@ -7,8 +7,8 @@ target_file_path = "/users/chrahul5/bnfs/unreliablefs/build/unreliablefs/mnt/am_
 # Creates a new file.
 fd = os.open(target_file_path, os.O_CREAT | os.O_TRUNC | os.O_RDWR)
 
-line1 = str.encode("this is line 1")
-line2 = str.encode("\nthis is line 2")
+line1 = str.encode("this is line 1\n")
+# line2 = str.encode("this is line 2\n")
 
 # W1
 numBytes1 = os.write(fd, line1)

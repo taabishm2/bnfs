@@ -276,14 +276,15 @@ int  CacheHelper::syncFileToTemp(const char *path, const char *data, bool close_
 int CacheHelper::writeFileToCache(const char* path, const char* data) {
     string cache_path = getCachePath(path);
 
-    ofstream file(cache_path, std::ios::binary | std::ios::out | std::ios::trunc);
+    ofstream file(cache_path, std::ios::out | std::ios::trunc);
     if (!file || !file.is_open())
     {
         cerr << "Failed to sync cache file: " << path << endl;
         return -1;
     }
 
-    file.write(data, strlen(data));
+    // cout << "writing to path " << cache_path << " " << data << endl;
+    file << data;
     file.close();
 
     return 0;
@@ -292,14 +293,15 @@ int CacheHelper::writeFileToCache(const char* path, const char* data) {
 int CacheHelper::writeFileToTemp(const char* path, const char* data) {
     string temp_path = getTempPath(path);
 
-    ofstream file(temp_path, std::ios::binary | std::ios::out | std::ios::trunc);
+    ofstream file(temp_path, std::ios::out | std::ios::trunc);
     if (!file || !file.is_open())
     {
         cerr << "Failed to sync temp file: " << path << endl;
         return -1;
     }
 
-    file.write(data, strlen(data));
+    // cout << "writing to path " << temp_path << " " << data << endl;
+    file << data;
     file.close();
 
     return 0;

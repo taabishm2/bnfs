@@ -18,6 +18,8 @@
 
 #define ERRNO_NOOP -999
 #define ERR_INSERT_TO_QUEUE -1000
+#define ERR_ALICE_REORDER -1001
+#define ERR_ALICE_DELAY -1002
 
 #include "unreliablefs_ops.h"
 
@@ -316,14 +318,13 @@ int unreliable_write(const char *path, const char *buf, size_t size,
                      off_t offset, struct fuse_file_info *fi)
 {
     int ret = error_inject(path, OP_WRITE);
-     printf("the ret is ==== %d\n", ret);
+    printf("the ret is ==== %d\n", ret);
     if (ret == -ERRNO_NOOP) {
         return 0;
-    } else if (ret == -ERR_INSERT_TO_QUEUE) {
-        printf("YAYAYYYYY ADDING TO QQQQQQ \n");
+    } else if (ret == -ERR_ALICE_DELAY) {
         // populate queue structs for write here.
-        QUEUE_addToQueue(afsClient, 1, path, fi, buf, size, offset);
-        // QUEUE_shuffleQueue(afsClient);
+        QUEUE_addToQueue(afsClient, 1, 2000, path, fi, buf, size, offset);
+        // printf("Now I am going to do queue insert\n");
 
         return size;
     } else if (ret) {
@@ -382,11 +383,19 @@ int unreliable_flush(const char *path, struct fuse_file_info *fi)
     printf("the ret is ==== %d\n", ret);
     if (ret == -ERRNO_NOOP) {
         return 0;
-    } else if (ret == -ERR_INSERT_TO_QUEUE) {
-        printf("YAYAYYYYY ADDING TO QQQQQQ \n");
-        // populate the queue
-        QUEUE_addToQueue(afsClient, 2, path, fi, NULL, 0, 0);
+    } else if (ret == -ERR_ALICE_REORDER) {
+        // populate the queue with operation id 2.
+        // Shuffle queue.
+        ret = close(dup(fi->fh));
+    if (ret == -1) {
+        return -errno;
+    }
+    
+        QUEUE_addToQueue(afsClient, 2, 0, path, fi, NULL, 0, 0);
         QUEUE_shuffleQueue(afsClient);
+
+        // printf("Now I am going to do queue shuffle\n");
+
         return 0;
     } else if (ret) {
         return ret;

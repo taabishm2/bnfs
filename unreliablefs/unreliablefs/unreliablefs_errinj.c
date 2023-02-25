@@ -232,10 +232,10 @@ int error_inject(const char* path, fuse_op operation)
             }
             break;
         case ERRINJ_ALICE_REORDER:
-            rc = -ERR_INSERT_TO_QUEUE;
+            rc = -ERR_ALICE_REORDER;
             break;
         case ERRINJ_ALICE_DELAY:
-            rc = -ERR_INSERT_TO_QUEUE;
+            rc = -ERR_ALICE_DELAY;
             break;
         }
     }
