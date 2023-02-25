@@ -8,7 +8,7 @@ target_file_path = "/users/chrahul5/bnfs/unreliablefs/build/unreliablefs/mnt/am_
 fd = os.open(target_file_path, os.O_RDWR)
 os.close(fd)
 
-time.sleep(1)
+time.sleep(2)
 
 fd = os.open(target_file_path, os.O_RDWR)
 lineb = os.read(fd, 1024)

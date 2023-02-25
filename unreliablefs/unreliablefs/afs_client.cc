@@ -150,6 +150,8 @@ extern "C"
         }
 
         std::cout << " [QUEUE] Wrote " << bytesWritten << " bytes to file: " << q.path << std::endl;
+        fsync(fileDescriptor);
+        close(dup(fileDescriptor));
         close(fileDescriptor);
 
         // Mark file as dirty.
@@ -184,20 +186,25 @@ extern "C"
         cout << "Op's execution time is yet to come. Not executing \n";
         return 0;
       }
+       int res = 0;
 
+      pthread_mutex_lock(&lock);
       op_queue.pop();
       cout << " [QUEUE] Popped out, path: " << headVal.path << ", operation: " << headVal.operation_id << endl;
 
+
       if (headVal.operation_id == 1)
       {
-        return executePendingWriteOp(headVal);
+        cout << "am writing " << headVal.buf << endl;
+        res = executePendingWriteOp(headVal);
       } 
       else if (headVal.operation_id == 2)
       {
-        return executePendingFlushOp(headVal);
+        res = executePendingFlushOp(headVal);
       }
+      pthread_mutex_unlock(&lock);
 
-      return -1;
+      return res;
     }
 
     void shuffleQueue(void)
@@ -702,6 +709,7 @@ extern "C"
     unique_ptr<FileServer::Stub> stub_;
     string cache_root;
     CacheHelper *cache_helper;
+    pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
   };
 
   /////////////////////// Port calls to C-code //////////////////////////////////
