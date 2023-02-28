@@ -3,13 +3,13 @@ The `main` branch contains code for our network file system (BNFS) including the
 
 # Building
 
-## This builds all the required repo.
+This builds all the required repo.
 Run `bash init.sh` 
 
 This builds the server and client executables at ./unreliablefs/build/unreliablefs/
 Run `source ./unrealiablefs/compile.sh`
 
-## Run server and client executable in separate sh terminals.
+Run server and client executable in separate sh terminals.
 Run `./afs_server`
 Run `mkdir mnt`
 Run `./unreliablefs mnt -d -basedir=/`
