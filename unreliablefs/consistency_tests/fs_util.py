@@ -92,7 +92,7 @@ def wait_for_signal(signal_fname: str,
     if do_print:
         print(f'wait for signal file {signal_fname}')
     while not os.path.exists(signal_fname):
-        time.sleep(0.7)
+        time.sleep(0.05)
 
 
 def start_another_client(host: str, test_case: int, client_id: str,
